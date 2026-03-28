@@ -35,6 +35,22 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium --with-deps
 
+      - name: Vänta på att GitHub Pages-deploymentet ska bli live
+        if: github.event_name == 'workflow_run'
+        run: |
+          URL="${{ 'https://silver-octo-succotash.frisemo.dev' }}"
+          echo "Väntar på att $URL ska svara..."
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "Siten är live (HTTP 200). Väntar ytterligare 10s för att CDN ska propagera..."
+              sleep 10
+              break
+            fi
+            echo "Försök $i/18: HTTP $STATUS – väntar 10s..."
+            sleep 10
+          done
+
       - name: Run E2E tests
         run: npm test
         env:
