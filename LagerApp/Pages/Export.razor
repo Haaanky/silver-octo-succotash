@@ -8,7 +8,7 @@
 
 <h1>Exportera data</h1>
 
-<p class="text-muted">Ladda ned lagerdata som CSV- eller JSON-fil, eller öppna e-postklienten med CSV-innehållet.</p>
+<p class="text-muted">Ladda ned lagerdata som CSV- eller JSON-fil, eller skicka via e-post.</p>
 
 @if (!string.IsNullOrEmpty(_message))
 {
@@ -23,22 +23,21 @@
         Ladda ned JSON
     </button>
     <button class="btn btn-outline-primary" @onclick="SendEmail" disabled="@_loading">
-        Öppna e-post med CSV
+        Ladda ned CSV &amp; öppna e-post
     </button>
 </div>
 
-@if (_showMailtoWarning)
+@if (_showMailtoInfo)
 {
-    <div class="alert alert-warning">
-        <strong>Varning:</strong> CSV-innehållet är för stort för att skicka via mailto-länken (&gt;1 500 tecken).
-        Ladda ned CSV-filen istället och bifoga den manuellt.
+    <div class="alert alert-info">
+        <strong>CSV-filen har laddats ned.</strong> Bifoga den i det e-postmeddelande som öppnas i din e-postklient.
     </div>
 }
 
 @code {
     private bool _loading = false;
     private string _message = string.Empty;
-    private bool _showMailtoWarning = false;
+    private bool _showMailtoInfo = false;
 
     private async Task<(List<StockTransaction> txs, List<Product> prods)> LoadDataAsync()
     {
@@ -72,21 +71,17 @@
     private async Task SendEmail()
     {
         _loading = true;
-        _showMailtoWarning = false;
+        _showMailtoInfo = false;
         _message = string.Empty;
 
         var (txs, prods) = await LoadDataAsync();
         var csv = ExportService.GenerateCsv(txs, prods);
+        var filename = $"lagerexport_{DateTime.Now:yyyyMMdd}.csv";
 
-        if (csv.Length > 1500)
-        {
-            _showMailtoWarning = true;
-            _loading = false;
-            return;
-        }
+        await ExportService.DownloadFileAsync(filename, csv, "text/csv;charset=utf-8;");
+        _showMailtoInfo = true;
 
-        var body = Uri.EscapeDataString(csv);
-        Nav.NavigateTo($"mailto:?subject=Lagerexport&body={body}");
+        Nav.NavigateTo($"mailto:?subject=Lagerexport {DateTime.Now:yyyy-MM-dd}&body={Uri.EscapeDataString($"Hej,\n\nBifogat finns lagerdatan som CSV ({filename}).\n")}");
         _loading = false;
     }
 }
