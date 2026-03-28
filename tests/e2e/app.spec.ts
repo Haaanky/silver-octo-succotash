@@ -37,10 +37,13 @@ test.describe('Lagerlista', () => {
   });
 
   test('visar tabellrubriker', async ({ page }) => {
+    // Wait for products to load so the table is fully rendered
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('table thead')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Produkt' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'SKU' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Saldo' })).toBeVisible();
+    // Use CSS-based th locators to avoid accessibility-tree lag
+    await expect(page.locator('table thead th').filter({ hasText: 'Produkt' })).toBeVisible();
+    await expect(page.locator('table thead th').filter({ hasText: 'SKU' })).toBeVisible();
+    await expect(page.locator('table thead th').filter({ hasText: 'Saldo' })).toBeVisible();
   });
 
   test('sökfältet filtrerar produkter', async ({ page }) => {
@@ -247,8 +250,8 @@ test.describe('Export', () => {
   });
 
   test('visar alla exportknappar', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Ladda ned CSV' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Ladda ned JSON' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ladda ned CSV', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ladda ned JSON', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Ladda ned CSV.*e-post/ })).toBeVisible();
   });
 
