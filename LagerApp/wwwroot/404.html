@@ -8,7 +8,7 @@
         // Redirects 404 back to index.html with the path encoded as a query param
         var l = window.location;
         l.replace(
-            l.protocol + '//' + l.host + l.pathname.split('/').slice(0, 2).join('/') +
+            l.protocol + '//' + l.host +
             '/?p=' + encodeURIComponent(l.pathname.slice(1) + l.search) +
             l.hash
         );

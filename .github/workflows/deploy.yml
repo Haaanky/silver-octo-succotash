@@ -20,11 +20,6 @@ jobs:
       - name: Publish Blazor WASM
         run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish
 
-      - name: Fix base href for GitHub Pages
-        run: |
-          sed -i 's|<base href="/" />|<base href="/silver-octo-succotash/" />|g' publish/wwwroot/index.html
-          sed -i 's|<base href="/" />|<base href="/silver-octo-succotash/" />|g' publish/wwwroot/404.html || true
-
       - name: Add .nojekyll
         run: touch publish/wwwroot/.nojekyll
 
@@ -32,3 +27,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: publish/wwwroot
+          cname: silver-octo-succotash.frisemo.dev
