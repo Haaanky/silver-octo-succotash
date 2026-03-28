@@ -25,16 +25,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Console.WriteLine("[Layout] OnInitializedAsync start");
         Nav.LocationChanged += OnLocationChanged;
-        Console.WriteLine("[Layout] Calling GetCurrentUserAsync");
         _currentUser = await AuthService.GetCurrentUserAsync();
-        Console.WriteLine("[Layout] GetCurrentUserAsync done, user=" + (_currentUser?.Email ?? "null"));
         _initialized = true;
 
         if (_currentUser is null && !_isLoginPage)
         {
-            Console.WriteLine("[Layout] Navigating to /login");
             Nav.NavigateTo("/login");
         }
     }
