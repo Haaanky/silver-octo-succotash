@@ -4,7 +4,7 @@
 <div class="scanner-container">
     @if (!_scanning && string.IsNullOrEmpty(_error))
     {
-        <button class="btn btn-primary" @onclick="StartScanning">
+        <button class="btn btn-primary mb-2" @onclick="StartScanning">
             Starta kamera
         </button>
     }
@@ -13,13 +13,6 @@
     {
         <div class="alert alert-warning">
             <strong>Kamera ej tillgänglig:</strong> @_error
-        </div>
-        <div class="mt-2">
-            <label class="form-label">Ange streckkod manuellt:</label>
-            <div class="input-group">
-                <input type="text" class="form-control" @bind="_manualBarcode" placeholder="Ange streckkod eller SKU" />
-                <button class="btn btn-secondary" @onclick="SubmitManual">OK</button>
-            </div>
         </div>
     }
 
@@ -31,15 +24,16 @@
                 <div class="scan-frame"></div>
             </div>
         </div>
-        <button class="btn btn-secondary mt-2" @onclick="StopScanning">Stoppa kamera</button>
-        <div class="mt-2">
-            <label class="form-label">Eller ange manuellt:</label>
-            <div class="input-group">
-                <input type="text" class="form-control" @bind="_manualBarcode" placeholder="Ange streckkod eller SKU" />
-                <button class="btn btn-secondary" @onclick="SubmitManual">OK</button>
-            </div>
-        </div>
+        <button class="btn btn-secondary mt-2 mb-2" @onclick="StopScanning">Stoppa kamera</button>
     }
+
+    <div class="mt-2">
+        <label class="form-label">@(_scanning ? "Eller ange manuellt:" : "Ange streckkod manuellt:")</label>
+        <div class="input-group">
+            <input type="text" class="form-control" @bind="_manualBarcode" @bind:event="oninput" @onkeydown="OnKeyDown" placeholder="Ange streckkod eller SKU" />
+            <button class="btn btn-secondary" @onclick="SubmitManual">OK</button>
+        </div>
+    </div>
 </div>
 
 @code {
@@ -94,6 +88,12 @@
             await StopScanning();
             await OnScanned.InvokeAsync(value);
         }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SubmitManual();
     }
 
     public async ValueTask DisposeAsync()
