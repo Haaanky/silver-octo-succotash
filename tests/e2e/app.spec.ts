@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,7 @@ test.describe('Inloggningssida', () => {
 
 test.describe('Lagerlista', () => {
   test.beforeEach(async ({ page }) => {
+    await seedProducts(page);
     await loginAsAdmin(page);
   });
 
@@ -102,6 +103,7 @@ test.describe('Navigation', () => {
 
 test.describe('Produkthantering', () => {
   test.beforeEach(async ({ page }) => {
+    await seedProducts(page);
     await loginAsAdmin(page);
     await page.click('a[href="/products"]');
     await expect(page.locator('h1')).toHaveText('Produkter');
@@ -164,6 +166,7 @@ test.describe('Produkthantering', () => {
 
 test.describe('Skanna / Transaktioner', () => {
   test.beforeEach(async ({ page }) => {
+    await seedProducts(page);
     await loginAsAdmin(page);
     await page.click('a[href="/scan"]');
     await expect(page.locator('h1')).toHaveText('Registrera rörelse');
