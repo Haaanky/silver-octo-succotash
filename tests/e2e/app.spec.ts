@@ -1,12 +1,12 @@
-import { test, expect, Page } from '@playwright/test';
-import { ADMIN, loginAsAdmin } from './helpers';
+import { test, expect } from '@playwright/test';
+import { ADMIN, loginAsAdmin, goto } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 test.describe('Inloggningssida', () => {
   test('omdirigerar till /login och visar formulär', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForURL('**/login', { timeout: 20_000 });
+    await goto(page, '/');
+    await page.waitForURL('**/login', { timeout: 30_000 });
     await expect(page.locator('h2')).toHaveText('LagerApp');
     await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
@@ -14,7 +14,8 @@ test.describe('Inloggningssida', () => {
   });
 
   test('visar felmeddelande vid fel lösenord', async ({ page }) => {
-    await page.goto('/login');
+    await goto(page, '/login');
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible({ timeout: 30_000 });
     await page.fill('input[autocomplete="username"]', ADMIN.email);
     await page.fill('input[type="password"]', 'felaktigt');
     await page.click('button[type="submit"]');
@@ -42,16 +43,13 @@ test.describe('Lagerlista', () => {
   });
 
   test('sökfältet filtrerar produkter', async ({ page }) => {
-    // Wait for table to appear (products loaded)
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
     const totalRows = await page.locator('table tbody tr').count();
 
-    // Type something unlikely to match all rows
     await page.fill('input[type="search"]', 'zzznomatch999');
     await expect(page.locator('table tbody tr')).toHaveCount(0);
     await expect(page.getByText('Inga produkter hittades.')).toBeVisible();
 
-    // Clear and verify rows come back
     await page.fill('input[type="search"]', '');
     await expect(page.locator('table tbody tr')).toHaveCount(totalRows);
   });
@@ -95,7 +93,7 @@ test.describe('Navigation', () => {
 
   test('logga ut omdirigerar till /login', async ({ page }) => {
     await page.click('button:has-text("Logga ut")');
-    await page.waitForURL('**/login', { timeout: 10_000 });
+    await page.waitForURL('**/login', { timeout: 15_000 });
     await expect(page.locator('h2')).toHaveText('LagerApp');
   });
 });
@@ -110,7 +108,7 @@ test.describe('Produkthantering', () => {
   });
 
   test('visar produktlista', async ({ page }) => {
-    await expect(page.locator('table')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15_000 });
   });
 
   test('kan skapa ny produkt', async ({ page }) => {
@@ -119,20 +117,17 @@ test.describe('Produkthantering', () => {
     await page.click('button:has-text("Ny produkt")');
     await expect(page.locator('.card-header')).toContainText('Skapa produkt');
 
-    await page.fill('input[placeholder=""]', ''); // clear
-    // Fill form fields by label order
-    const inputs = page.locator('.card-body input');
-    await inputs.nth(0).fill(name);           // Namn
-    await inputs.nth(1).fill('TST-001');      // SKU
-    await inputs.nth(2).fill('1234567890');   // Streckkod
-    await inputs.nth(3).fill('st');           // Enhet
+    const inputs = page.locator('.card-body input[type="text"], .card-body input:not([type])');
+    await inputs.nth(0).fill(name);        // Namn
+    await inputs.nth(1).fill('TST-001');   // SKU
+    await inputs.nth(2).fill('1234567890'); // Streckkod
+    await inputs.nth(3).fill('st');        // Enhet
     await page.locator('input[type="number"]').nth(0).fill('5');  // Miniminivå
     await page.locator('input[type="number"]').nth(1).fill('10'); // Startsaldo
 
     await page.click('button:has-text("Spara")');
 
-    // Form should close and product appear in table
-    await expect(page.locator('.card-header')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('.card-header')).toHaveCount(0, { timeout: 10_000 });
     await expect(page.locator('table')).toContainText(name);
   });
 
@@ -143,26 +138,25 @@ test.describe('Produkthantering', () => {
   });
 
   test('kan redigera en produkt', async ({ page }) => {
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
     await page.locator('button:has-text("Redigera")').first().click();
     await expect(page.locator('.card-header')).toContainText('Redigera produkt');
 
-    const nameInput = page.locator('.card-body input').first();
-    await nameInput.fill('');
+    const nameInput = page.locator('.card-body input[type="text"], .card-body input:not([type])').first();
     const editedName = `Redigerad ${Date.now()}`;
     await nameInput.fill(editedName);
     await page.click('button:has-text("Spara")');
 
-    await expect(page.locator('.card-header')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('.card-header')).toHaveCount(0, { timeout: 10_000 });
     await expect(page.locator('table')).toContainText(editedName);
   });
 
   test('kan avbryta redigering', async ({ page }) => {
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
     await page.locator('button:has-text("Redigera")').first().click();
     await expect(page.locator('.card-header')).toBeVisible();
     await page.click('button:has-text("Avbryt")');
-    await expect(page.locator('.card-header')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('.card-header')).toHaveCount(0, { timeout: 10_000 });
   });
 });
 
@@ -180,37 +174,34 @@ test.describe('Skanna / Transaktioner', () => {
   });
 
   test('visar varning för okänd streckkod', async ({ page }) => {
-    // Trigger scan with unknown barcode via the manual input in BarcodeScanner
-    const scanInput = page.locator('input[type="text"], input:not([type])').first();
+    const scanInput = page.locator('input[type="text"], input:not([type="password"]):not([type="search"]):not([type="number"])').first();
     await scanInput.fill('OKANDSTRECKKOD999');
     await scanInput.press('Enter');
-    await expect(page.locator('.alert-warning')).toContainText('Produkt hittades inte', { timeout: 10_000 });
+    await expect(page.locator('.alert-warning')).toContainText('Produkt hittades inte', { timeout: 15_000 });
   });
 
   test('kan registrera inleverans för befintlig produkt', async ({ page }) => {
-    // First find a real barcode from the products page
-    await page.goto('/products');
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
+    // Get a real barcode from the products page
+    await goto(page, '/products');
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
     const barcodeCell = page.locator('table tbody tr').first().locator('code').nth(1);
     const barcode = (await barcodeCell.textContent()) ?? '';
     expect(barcode.length).toBeGreaterThan(0);
 
-    await page.goto('/scan');
-    await expect(page.locator('h1')).toHaveText('Registrera rörelse');
+    await goto(page, '/scan');
+    await expect(page.locator('h1')).toHaveText('Registrera rörelse', { timeout: 30_000 });
 
-    const scanInput = page.locator('input[type="text"], input:not([type])').first();
+    const scanInput = page.locator('input[type="text"], input:not([type="password"]):not([type="search"]):not([type="number"])').first();
     await scanInput.fill(barcode);
     await scanInput.press('Enter');
 
-    // Should show product card
-    await expect(page.locator('.card h5')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.card h5')).toBeVisible({ timeout: 15_000 });
 
-    // Select Inleverans, set quantity to 1
     await page.selectOption('select', 'in');
     await page.fill('input[type="number"]', '1');
     await page.click('button:has-text("Registrera")');
 
-    await expect(page.locator('.alert-success')).toContainText('inleverans', { timeout: 10_000 });
+    await expect(page.locator('.alert-success')).toContainText('inleverans', { timeout: 15_000 });
   });
 });
 
@@ -224,16 +215,15 @@ test.describe('Transaktionshistorik', () => {
   });
 
   test('visar historiktabell eller tomt-meddelande', async ({ page }) => {
-    // Either the table is visible, or the empty-state message
     const table = page.locator('table');
     const empty = page.getByText('Inga transaktioner registrerade än.');
-    await expect(table.or(empty)).toBeVisible({ timeout: 10_000 });
+    await expect(table.or(empty)).toBeVisible({ timeout: 15_000 });
   });
 
-  test('tabellen har rätt kolumner', async ({ page }) => {
+  test('tabellen har rätt kolumner om transaktioner finns', async ({ page }) => {
     const table = page.locator('table');
     const empty = page.getByText('Inga transaktioner registrerade än.');
-    await expect(table.or(empty)).toBeVisible({ timeout: 10_000 });
+    await expect(table.or(empty)).toBeVisible({ timeout: 15_000 });
 
     if (await table.isVisible()) {
       await expect(page.getByRole('columnheader', { name: 'Tidpunkt' })).toBeVisible();
@@ -264,7 +254,7 @@ test.describe('Export', () => {
     await page.click('button:has-text("Ladda ned CSV")');
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/lagerexport_\d+\.csv/);
-    await expect(page.locator('.alert-info')).toContainText('CSV-fil nedladdad', { timeout: 10_000 });
+    await expect(page.locator('.alert-info')).toContainText('CSV-fil nedladdad', { timeout: 15_000 });
   });
 
   test('JSON-nedladdning visar bekräftelsemeddelande', async ({ page }) => {
@@ -272,7 +262,7 @@ test.describe('Export', () => {
     await page.click('button:has-text("Ladda ned JSON")');
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/lagerexport_\d+\.json/);
-    await expect(page.locator('.alert-info')).toContainText('JSON-fil nedladdad', { timeout: 10_000 });
+    await expect(page.locator('.alert-info')).toContainText('JSON-fil nedladdad', { timeout: 15_000 });
   });
 });
 
@@ -280,15 +270,15 @@ test.describe('Export', () => {
 
 test.describe('Sessionshantering', () => {
   test('skyddad sida utan session omdirigerar till /login', async ({ page }) => {
-    await page.goto('/products');
-    await page.waitForURL('**/login', { timeout: 20_000 });
+    await goto(page, '/products');
+    await page.waitForURL('**/login', { timeout: 30_000 });
   });
 
   test('efter utloggning kan man inte nå skyddade sidor', async ({ page }) => {
     await loginAsAdmin(page);
     await page.click('button:has-text("Logga ut")');
-    await page.waitForURL('**/login', { timeout: 10_000 });
-    await page.goto('/products');
-    await page.waitForURL('**/login', { timeout: 10_000 });
+    await page.waitForURL('**/login', { timeout: 15_000 });
+    await goto(page, '/products');
+    await page.waitForURL('**/login', { timeout: 15_000 });
   });
 });

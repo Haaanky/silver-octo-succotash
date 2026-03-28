@@ -20,6 +20,21 @@ Testerna körs alltid mot `https://silver-octo-succotash.frisemo.dev` (eller `BA
 4. **Alla tester måste bli gröna** – inga failed, inga skipped som testar riktig funktionalitet.
 5. **Vid fel: fixa koden, pusha igen, vänta på ny deployment, kör testerna igen** – iterera tills allt är grönt.
 
+### ⚠️ Viktig begränsning i Claude Code-containern
+
+Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROXY` / `HTTP_PROXY` är satta). Headless Chromium laddar ner alla WASM-resurser men .NET-runtimen exekverar aldrig C#-koden fullt ut i denna miljö (troligen p.g.a. att proxy-SSL-interceptionen påverkar WASM-exekveringen).
+
+**Konsekvens:** `npm test` kan inte köras framgångsrikt direkt i Claude Code-containern.
+
+**Lösning – verifiera via GitHub Actions CI:**
+
+1. Mergea ändringar till `main` (se steg 1-2 ovan)
+2. GitHub Actions kör automatiskt `Deploy to GitHub Pages` → sedan `E2E Tests`
+3. Kontrollera att E2E-workflow-körningen (`E2E Tests`) är grön i GitHub Actions
+4. Om CI-testerna misslyckas: läs felloggarna, fixa koden, pusha igen, iterera
+
+GitHub Actions-miljön har ingen proxy och Chromium kan köra .NET WASM normalt där.
+
 ### Vad testerna täcker
 
 Testerna i `tests/e2e/app.spec.ts` verifierar att följande faktiskt fungerar i produktion:
@@ -46,7 +61,7 @@ Varje ny sida eller funktion ska ha minst:
 - Ett test som verifierar den primära funktionaliteten (happy path)
 - Ett test för felhantering om relevant
 
-### Köra enstaka tester
+### Köra enstaka tester (om miljön tillåter)
 
 ```bash
 # Kör bara ett specifikt describe-block
@@ -63,3 +78,4 @@ npm run test:report
 - Om `@playwright/test` saknas: `npm ci`
 - Om browser saknas: `npx playwright install chromium --with-deps`
 - Playwright-version måste matcha cachad browser-version (se `package.json`)
+- `playwright.config.ts` läser automatiskt `HTTPS_PROXY`/`HTTP_PROXY` från miljön och konfigurerar Chromium med proxy-credentials
