@@ -1,0 +1,35 @@
+@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+
+@if (_initialized)
+{
+    @if (_currentUser is null && !_isLoginPage)
+    {
+        <!-- redirect handled in OnInitializedAsync -->
+    }
+    else
+    {
+        <NavMenu />
+        <main class="container mt-4 pb-4">
+            @Body
+        </main>
+    }
+}
+
+@code {
+    private User? _currentUser;
+    private bool _initialized = false;
+    private bool _isLoginPage => Nav.Uri.Contains("/login");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUser = await AuthService.GetCurrentUserAsync();
+        _initialized = true;
+
+        if (_currentUser is null && !_isLoginPage)
+        {
+            Nav.NavigateTo("/login");
+        }
+    }
+}

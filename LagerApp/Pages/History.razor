@@ -1,0 +1,88 @@
+@page "/history"
+@inject ITransactionService TransactionService
+@inject IProductService ProductService
+@inject IAuthService AuthService
+
+<PageTitle>Transaktionshistorik — LagerApp</PageTitle>
+
+<h1>Transaktionshistorik</h1>
+
+@if (!_isAdmin)
+{
+    <div class="alert alert-danger">Åtkomst nekad. Endast admins kan se historiken.</div>
+    return;
+}
+
+@if (_transactions is null)
+{
+    <p>Laddar…</p>
+}
+else if (!_transactions.Any())
+{
+    <p class="text-muted">Inga transaktioner registrerade än.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Tidpunkt</th>
+                    <th>Produkt</th>
+                    <th>Typ</th>
+                    <th>Antal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tx in _transactions)
+                {
+                    <tr>
+                        <td>@FormatTimestamp(tx.Timestamp)</td>
+                        <td>@GetProductName(tx.ProductId)</td>
+                        <td>
+                            @if (tx.Type == "in")
+                            {
+                                <span class="badge bg-success">Inleverans</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">Utleverans</span>
+                            }
+                        </td>
+                        <td>@tx.Quantity</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<StockTransaction>? _transactions;
+    private List<Product> _products = new();
+    private bool _isAdmin = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        _isAdmin = user?.IsAdmin == true;
+        if (_isAdmin)
+        {
+            _products = await ProductService.GetAllAsync();
+            _transactions = await TransactionService.GetAllAsync();
+        }
+    }
+
+    private string GetProductName(string productId)
+    {
+        var p = _products.FirstOrDefault(p => p.Id == productId);
+        return p?.Name ?? productId;
+    }
+
+    private static string FormatTimestamp(string ts)
+    {
+        if (DateTime.TryParse(ts, out var dt))
+            return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        return ts;
+    }
+}
