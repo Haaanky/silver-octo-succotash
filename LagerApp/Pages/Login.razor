@@ -1,0 +1,77 @@
+@page "/login"
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+
+<PageTitle>Logga in — LagerApp</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-sm-8 col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">LagerApp</h2>
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="alert alert-danger">@_error</div>
+                }
+
+                <EditForm Model="_model" OnValidSubmit="HandleLogin">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">E-post</label>
+                        <InputText class="form-control" @bind-Value="_model.Email" autocomplete="username" />
+                        <ValidationMessage For="() => _model.Email" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Lösenord</label>
+                        <InputText type="password" class="form-control" @bind-Value="_model.Password" autocomplete="current-password" />
+                        <ValidationMessage For="() => _model.Password" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
+                        @(_loading ? "Loggar in…" : "Logga in")
+                    </button>
+                </EditForm>
+
+                <p class="text-muted mt-3 small text-center">
+                    Standard: admin@lager.se / admin123
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel _model = new();
+    private string _error = string.Empty;
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.SeedDefaultAdminAsync();
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user is not null)
+            Nav.NavigateTo("/");
+    }
+
+    private async Task HandleLogin()
+    {
+        _loading = true;
+        _error = string.Empty;
+        var success = await AuthService.LoginAsync(_model.Email, _model.Password);
+        _loading = false;
+
+        if (success)
+            Nav.NavigateTo("/");
+        else
+            _error = "Fel e-post eller lösenord.";
+    }
+
+    private class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "E-post krävs")]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Lösenord krävs")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

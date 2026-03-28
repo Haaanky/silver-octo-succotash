@@ -1,0 +1,92 @@
+@page "/export"
+@inject ITransactionService TransactionService
+@inject IProductService ProductService
+@inject IExportService ExportService
+@inject NavigationManager Nav
+
+<PageTitle>Export — LagerApp</PageTitle>
+
+<h1>Exportera data</h1>
+
+<p class="text-muted">Ladda ned lagerdata som CSV- eller JSON-fil, eller öppna e-postklienten med CSV-innehållet.</p>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert alert-info">@_message</div>
+}
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <button class="btn btn-primary" @onclick="DownloadCsv" disabled="@_loading">
+        Ladda ned CSV
+    </button>
+    <button class="btn btn-secondary" @onclick="DownloadJson" disabled="@_loading">
+        Ladda ned JSON
+    </button>
+    <button class="btn btn-outline-primary" @onclick="SendEmail" disabled="@_loading">
+        Öppna e-post med CSV
+    </button>
+</div>
+
+@if (_showMailtoWarning)
+{
+    <div class="alert alert-warning">
+        <strong>Varning:</strong> CSV-innehållet är för stort för att skicka via mailto-länken (&gt;1 500 tecken).
+        Ladda ned CSV-filen istället och bifoga den manuellt.
+    </div>
+}
+
+@code {
+    private bool _loading = false;
+    private string _message = string.Empty;
+    private bool _showMailtoWarning = false;
+
+    private async Task<(List<StockTransaction> txs, List<Product> prods)> LoadDataAsync()
+    {
+        var txs = await TransactionService.GetAllAsync();
+        var prods = await ProductService.GetAllAsync();
+        return (txs, prods);
+    }
+
+    private async Task DownloadCsv()
+    {
+        _loading = true;
+        _message = string.Empty;
+        var (txs, prods) = await LoadDataAsync();
+        var csv = ExportService.GenerateCsv(txs, prods);
+        await ExportService.DownloadFileAsync($"lagerexport_{DateTime.Now:yyyyMMdd}.csv", csv, "text/csv;charset=utf-8;");
+        _message = "CSV-fil nedladdad.";
+        _loading = false;
+    }
+
+    private async Task DownloadJson()
+    {
+        _loading = true;
+        _message = string.Empty;
+        var (txs, prods) = await LoadDataAsync();
+        var json = ExportService.GenerateJson(txs, prods);
+        await ExportService.DownloadFileAsync($"lagerexport_{DateTime.Now:yyyyMMdd}.json", json, "application/json;charset=utf-8;");
+        _message = "JSON-fil nedladdad.";
+        _loading = false;
+    }
+
+    private async Task SendEmail()
+    {
+        _loading = true;
+        _showMailtoWarning = false;
+        _message = string.Empty;
+
+        var (txs, prods) = await LoadDataAsync();
+        var csv = ExportService.GenerateCsv(txs, prods);
+
+        if (csv.Length > 1500)
+        {
+            _showMailtoWarning = true;
+            _loading = false;
+            return;
+        }
+
+        var body = Uri.EscapeDataString(csv);
+        Nav.NavigateTo($"mailto:?subject=Lagerexport&body={body}");
+        _loading = false;
+    }
+}
