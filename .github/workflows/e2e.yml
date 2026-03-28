@@ -39,15 +39,15 @@ jobs:
         if: github.event_name == 'workflow_run'
         run: |
           URL="${{ 'https://silver-octo-succotash.frisemo.dev' }}"
-          echo "Väntar på att $URL ska svara..."
-          for i in $(seq 1 18); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
-            if [ "$STATUS" = "200" ]; then
-              echo "Siten är live (HTTP 200). Väntar ytterligare 10s för att CDN ska propagera..."
-              sleep 10
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "Väntar på att $URL/version.txt ska innehålla commit $SHA..."
+          for i in $(seq 1 60); do
+            DEPLOYED=$(curl -s "$URL/version.txt" 2>/dev/null | tr -d '[:space:]')
+            if [ "$DEPLOYED" = "$SHA" ]; then
+              echo "Rätt version live: $DEPLOYED. Klart!"
               break
             fi
-            echo "Försök $i/18: HTTP $STATUS – väntar 10s..."
+            echo "Försök $i/60: live=$DEPLOYED, want=$SHA – väntar 10s..."
             sleep 10
           done
 

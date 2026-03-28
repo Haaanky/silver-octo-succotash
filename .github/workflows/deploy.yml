@@ -28,6 +28,9 @@ jobs:
       - name: Add .nojekyll
         run: touch publish/wwwroot/.nojekyll
 
+      - name: Write version file for deploy verification
+        run: echo "${{ github.sha }}" > publish/wwwroot/version.txt
+
       - name: Configure GitHub Pages source to gh-pages branch
         run: |
           gh api --method PUT /repos/${{ github.repository }}/pages \
