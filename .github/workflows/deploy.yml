@@ -5,9 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -16,9 +14,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,9 +27,8 @@ jobs:
       - name: Add .nojekyll
         run: touch publish/wwwroot/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: publish/wwwroot
-
-      - uses: actions/deploy-pages@v4
-        id: deployment
+          folder: publish/wwwroot
+          clean: true
+          clean-exclude: pr-preview
