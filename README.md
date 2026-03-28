@@ -1,5 +1,7 @@
 # LagerApp
 
+**Live:** https://silver-octo-succotash.frisemo.dev
+
 En webb-baserad lagerhanteringsapp för att scanna streckkoder/QR-koder och hålla koll på lagersaldo. Byggd med Blazor WebAssembly och deployad som statisk app via GitHub Pages.
 
 ## Funktioner (MVP)
