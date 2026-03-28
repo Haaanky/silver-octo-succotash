@@ -5,11 +5,20 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -20,15 +29,12 @@ jobs:
       - name: Publish Blazor WASM
         run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish
 
-      - name: Fix base href for GitHub Pages
-        run: |
-          sed -i 's|<base href="/" />|<base href="/silver-octo-succotash/" />|g' publish/wwwroot/index.html
-          sed -i 's|<base href="/" />|<base href="/silver-octo-succotash/" />|g' publish/wwwroot/404.html || true
-
       - name: Add .nojekyll
         run: touch publish/wwwroot/.nojekyll
 
-      - uses: peaceiris/actions-gh-pages@v4
+      - uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: publish/wwwroot
+          path: publish/wwwroot
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
