@@ -37,6 +37,9 @@ jobs:
       - name: Write version file
         run: echo "${{ github.sha }}" > web/dist/version.txt
 
+      - name: Copy index.html as 404.html for SPA routing
+        run: cp web/dist/index.html web/dist/404.html
+
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: web/dist
