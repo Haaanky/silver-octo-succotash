@@ -133,54 +133,8 @@ export default function Scan() {
 
       {step === 'scan' && (
         <div className="card p-6 space-y-4">
-          {/* Camera */}
-          <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden relative">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-            />
-            {!scanning && !cameraError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M3 9V6a3 3 0 013-3h2M3 15v3a3 3 0 003 3h2m10-18h2a3 3 0 013 3v3m0 6v3a3 3 0 01-3 3h-2M9 9h6v6H9z" />
-                  </svg>
-                </div>
-                <button onClick={startCamera} className="btn bg-white text-slate-900 hover:bg-slate-100 shadow-lg">
-                  Starta kamera
-                </button>
-              </div>
-            )}
-            {scanning && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 border-2 border-white/60 rounded-xl relative">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-indigo-400 rounded-tl" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-indigo-400 rounded-tr" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-indigo-400 rounded-bl" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-indigo-400 rounded-br" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {cameraError && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-              {cameraError}
-            </div>
-          )}
-
-          {unknownBarcode && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              Okänd streckkod: <strong>{unknownBarcode}</strong>. Ingen produkt hittades.
-            </div>
-          )}
-
-          {/* Manual input */}
+          {/* Manual input – primary */}
           <div>
-            <p className="text-xs text-slate-500 font-medium mb-2">Eller ange manuellt:</p>
             <form onSubmit={handleManualSubmit} className="flex gap-2">
               <input
                 type="text"
@@ -188,10 +142,59 @@ export default function Scan() {
                 placeholder="Streckkod eller SKU"
                 value={manualInput}
                 onChange={e => setManualInput(e.target.value)}
+                autoFocus
               />
               <button type="submit" className="btn-primary shrink-0">Sök</button>
             </form>
           </div>
+
+          {unknownBarcode && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              Okänd streckkod: <strong>{unknownBarcode}</strong>. Ingen produkt hittades.
+            </div>
+          )}
+
+          {/* Camera – secondary */}
+          <div>
+            <p className="text-xs text-slate-500 font-medium mb-2">Eller skanna med kamera:</p>
+            <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden relative">
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                playsInline
+                muted
+              />
+              {!scanning && !cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center">
+                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M3 9V6a3 3 0 013-3h2M3 15v3a3 3 0 003 3h2m10-18h2a3 3 0 013 3v3m0 6v3a3 3 0 01-3 3h-2M9 9h6v6H9z" />
+                    </svg>
+                  </div>
+                  <button onClick={startCamera} className="btn bg-white text-slate-900 hover:bg-slate-100 shadow-lg">
+                    Starta kamera
+                  </button>
+                </div>
+              )}
+              {scanning && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-48 h-48 border-2 border-white/60 rounded-xl relative">
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-indigo-400 rounded-tl" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-indigo-400 rounded-tr" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-indigo-400 rounded-bl" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-indigo-400 rounded-br" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {cameraError && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+              {cameraError}
+            </div>
+          )}
         </div>
       )}
 
