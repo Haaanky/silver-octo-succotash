@@ -25,7 +25,7 @@ jobs:
           dotnet-version: '9.x'
 
       - name: Publish Blazor WASM
-        run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish
+        run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish-blazor
 
       - uses: actions/setup-node@v4
         with:
@@ -41,18 +41,59 @@ jobs:
         working-directory: web
         run: npm run build
 
-      - name: Copy React app to /web/ subdirectory
-        run: cp -r web/dist publish/wwwroot/web
+      - name: Assemble deploy directory
+        run: |
+          mkdir -p deploy
+          # React at root
+          cp -r web/dist/. deploy/
+          # Blazor at /blazor/
+          mkdir -p deploy/blazor
+          cp -r publish-blazor/wwwroot/. deploy/blazor/
+          # Update Blazor base href to /blazor/
+          sed -i 's|<base href="/" />|<base href="/blazor/" />|' deploy/blazor/index.html
+          # CNAME must only be at root
+          cp CNAME deploy/CNAME
+          rm -f deploy/blazor/CNAME
+
+      - name: Create 404.html for SPA routing
+        run: |
+          cat > deploy/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="sv">
+          <head>
+              <meta charset="utf-8" />
+              <title>LagerApp</title>
+              <script>
+                  var l = window.location;
+                  var path = l.pathname;
+                  if (path.startsWith('/blazor/')) {
+                      // Blazor SPA fallback – re-encode path under /blazor/
+                      l.replace(
+                          l.protocol + '//' + l.host +
+                          '/blazor/?p=' + encodeURIComponent(path.slice('/blazor/'.length) + l.search) +
+                          l.hash
+                      );
+                  } else {
+                      // React uses HashRouter – redirect to root
+                      l.replace(l.protocol + '//' + l.host + '/');
+                  }
+              </script>
+          </head>
+          <body>
+              <p>Omdirigerar…</p>
+          </body>
+          </html>
+          EOF
 
       - name: Add .nojekyll
-        run: touch publish/wwwroot/.nojekyll
+        run: touch deploy/.nojekyll
 
       - name: Write version file for deploy verification
-        run: echo "${{ github.sha }}" > publish/wwwroot/version.txt
+        run: echo "${{ github.sha }}" > deploy/version.txt
 
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: publish/wwwroot
+          folder: deploy
           # Preserve pr-preview/ subdirectory so previews survive main deploys
           clean-exclude: pr-preview
           single-commit: true

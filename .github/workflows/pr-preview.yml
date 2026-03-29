@@ -25,12 +25,7 @@ jobs:
 
       - name: Publish Blazor WASM
         if: github.event.action != 'closed'
-        run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish
-
-      - name: Set base href for preview path
-        if: github.event.action != 'closed'
-        run: |
-          sed -i 's|<base href="/" />|<base href="/pr-preview/pr-${{ github.event.number }}/" />|' publish/wwwroot/index.html
+        run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish-blazor
 
       - uses: actions/setup-node@v4
         if: github.event.action != 'closed'
@@ -48,11 +43,20 @@ jobs:
         if: github.event.action != 'closed'
         working-directory: web
         # Override the base path so all assets load correctly under the preview URL
-        run: npx vite build --base /pr-preview/pr-${{ github.event.number }}/web/
+        run: npx vite build --base /pr-preview/pr-${{ github.event.number }}/
 
-      - name: Copy React app to preview /web/ subdirectory
+      - name: Assemble deploy directory
         if: github.event.action != 'closed'
-        run: cp -r web/dist publish/wwwroot/web
+        run: |
+          mkdir -p publish/wwwroot
+          # React at root of preview
+          cp -r web/dist/. publish/wwwroot/
+          # Blazor at /blazor/ within preview
+          mkdir -p publish/wwwroot/blazor
+          cp -r publish-blazor/wwwroot/. publish/wwwroot/blazor/
+          # Update Blazor base href for preview path
+          sed -i 's|<base href="/" />|<base href="/pr-preview/pr-${{ github.event.number }}/blazor/" />|' publish/wwwroot/blazor/index.html
+          rm -f publish/wwwroot/blazor/CNAME
 
       - name: Add .nojekyll
         if: github.event.action != 'closed'

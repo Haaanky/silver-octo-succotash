@@ -62,7 +62,7 @@ export default function NavBar() {
 
           {/* Link to Blazor */}
           <a
-            href="/"
+            href="/blazor/"
             className="hidden md:inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
             title="Öppna Blazor-versionen"
           >

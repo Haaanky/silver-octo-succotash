@@ -11,8 +11,9 @@
         (function () {
             var search = window.location.search;
             if (search.startsWith('?p=')) {
+                var base = document.querySelector('base')?.getAttribute('href') ?? '/';
                 var path = decodeURIComponent(search.slice(3));
-                window.history.replaceState(null, null, '/' + path);
+                window.history.replaceState(null, null, base + path);
             }
         })();
     </script>

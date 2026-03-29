@@ -103,7 +103,7 @@ export default function Login() {
         {/* Link to Blazor version */}
         <p className="text-center mt-6 text-xs text-slate-500">
           Vill du använda{' '}
-          <a href="/" className="text-indigo-600 hover:underline font-medium">
+          <a href="/blazor/" className="text-indigo-600 hover:underline font-medium">
             Blazor-versionen
           </a>
           ?
