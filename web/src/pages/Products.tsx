@@ -138,7 +138,7 @@ export default function Products() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-600">{error}</p>
+              <p role="alert" className="text-sm text-red-600">{error}</p>
             )}
 
             <div className="flex gap-3 pt-2">

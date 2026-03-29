@@ -93,7 +93,6 @@ export default function Export() {
         </svg>
         <p className="text-sm text-slate-600">
           All data lagras lokalt i din webbläsare. Exportera regelbundet för att säkerhetskopiera din lagerdata.
-          Data delas med Blazor-versionen av appen via samma localStorage.
         </p>
       </div>
 

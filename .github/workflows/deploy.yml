@@ -20,13 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.x'
-
-      - name: Publish Blazor WASM
-        run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -41,18 +34,15 @@ jobs:
         working-directory: web
         run: npm run build
 
-      - name: Copy React app to /web/ subdirectory
-        run: cp -r web/dist publish/wwwroot/web
-
       - name: Add .nojekyll
-        run: touch publish/wwwroot/.nojekyll
+        run: touch web/dist/.nojekyll
 
       - name: Write version file for deploy verification
-        run: echo "${{ github.sha }}" > publish/wwwroot/version.txt
+        run: echo "${{ github.sha }}" > web/dist/version.txt
 
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: publish/wwwroot
+          folder: web/dist
           # Preserve pr-preview/ subdirectory so previews survive main deploys
           clean-exclude: pr-preview
           single-commit: true
