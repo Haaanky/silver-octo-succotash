@@ -19,6 +19,7 @@ export default function Scan() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
+  const zxingControlsRef = useRef<{ stop: () => void } | null>(null)
 
   const handleBarcode = useCallback((code: string) => {
     setScanning(false)
@@ -36,6 +37,8 @@ export default function Scan() {
 
   const stopCamera = () => {
     cancelAnimationFrame(rafRef.current)
+    zxingControlsRef.current?.stop()
+    zxingControlsRef.current = null
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
   }
@@ -48,34 +51,47 @@ export default function Scan() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
 
-      if (!('BarcodeDetector' in window)) {
-        setCameraError('Din webbläsare stödjer inte automatisk streckkodsskanning. Ange streckkoden manuellt.')
-        stopCamera()
-        setScanning(false)
-        return
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const detector = new (window as any).BarcodeDetector()
-      const detect = async () => {
-        if (!videoRef.current || !streamRef.current) return
-        try {
-          const codes = await detector.detect(videoRef.current)
-          if (codes.length > 0) {
-            handleBarcode(codes[0].rawValue as string)
-            return
+      if ('BarcodeDetector' in window) {
+        // Native path – Chrome on Android/Desktop
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detector = new (window as any).BarcodeDetector()
+        const detect = async () => {
+          if (!videoRef.current || !streamRef.current) return
+          try {
+            const codes = await detector.detect(videoRef.current)
+            if (codes.length > 0) {
+              handleBarcode(codes[0].rawValue as string)
+              return
+            }
+          } catch {
+            // continue scanning
           }
-        } catch {
-          // continue scanning
+          rafRef.current = requestAnimationFrame(detect)
         }
         rafRef.current = requestAnimationFrame(detect)
+      } else {
+        // ZXing fallback – iOS, Firefox, and other browsers without BarcodeDetector
+        const { BrowserMultiFormatReader } = await import('@zxing/browser')
+        const reader = new BrowserMultiFormatReader()
+        if (!videoRef.current) {
+          setCameraError('Kunde inte komma åt kameran. Ange streckkoden manuellt.')
+          setScanning(false)
+          return
+        }
+        const controls = await reader.decodeFromStream(stream, videoRef.current, (result) => {
+          if (result) {
+            zxingControlsRef.current?.stop()
+            zxingControlsRef.current = null
+            handleBarcode(result.getText())
+          }
+        })
+        zxingControlsRef.current = controls
       }
-      rafRef.current = requestAnimationFrame(detect)
     } catch {
       setCameraError('Kunde inte komma åt kameran. Ange streckkoden manuellt.')
       setScanning(false)
