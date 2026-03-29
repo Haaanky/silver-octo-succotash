@@ -1,41 +1,51 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 
 export const ADMIN = { email: 'admin@lager.se', password: 'admin123' };
 
-/** A stable seed product used by tests that require pre-existing products. */
+const SUPABASE_URL = process.env.SUPABASE_URL ?? 'https://ihqqqynuqclycffgraxl.supabase.co';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+
 export const SEED_PRODUCT = {
-  Id: 'test-seed-product-001',
-  Name: 'Testprodukt Seed',
-  Sku: 'SEED-001',
-  Barcode: '1234567890123',
-  Unit: 'st',
-  MinStock: 5,
-  CurrentStock: 10,
+  id: 'test-seed-product-001',
+  name: 'Testprodukt Seed',
+  sku: 'SEED-001',
+  barcode: '1234567890123',
+  unit: 'st',
+  min_stock: 5,
+  current_stock: 10,
 };
 
 /**
- * Registers an init script that seeds lager_products into localStorage
- * BEFORE the page (and Blazor) loads. Must be called before goto/loginAsAdmin.
+ * Seeds test products directly via Supabase service role (bypasses RLS).
+ * Requires SUPABASE_SERVICE_ROLE_KEY env variable.
  */
-export async function seedProducts(page: Page) {
-  await page.addInitScript((products) => {
-    localStorage.setItem('lager_products', JSON.stringify(products));
-  }, [SEED_PRODUCT]);
+export async function seedProducts(_page: Page) {
+  if (!SERVICE_ROLE_KEY) return;
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  await admin.from('products').upsert([SEED_PRODUCT], { onConflict: 'id' });
 }
 
-/** Navigate to a URL and wait only for DOM content – Blazor WASM loads async. */
+/**
+ * Deletes seed test data. Call in afterEach/afterAll to keep DB clean.
+ */
+export async function cleanupSeedProducts() {
+  if (!SERVICE_ROLE_KEY) return;
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  await admin.from('products').delete().eq('id', SEED_PRODUCT.id);
+}
+
 export async function goto(page: Page, url: string) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 }
 
 export async function loginAsAdmin(page: Page) {
   await goto(page, '/login');
-  await expect(page.locator('input[autocomplete="username"]')).toBeVisible({ timeout: 30_000 });
-  await page.fill('input[autocomplete="username"]', ADMIN.email);
+  await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
+  await page.fill('input[type="email"]', ADMIN.email);
   await page.fill('input[type="password"]', ADMIN.password);
   await page.click('button[type="submit"]');
-  // Wait for redirect away from /login and lagerlistan heading
-  await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 30_000 });
+  await page.waitForURL(url => !url.hash.includes('login') && !url.pathname.includes('login'), { timeout: 30_000 });
   await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 30_000 });
 }

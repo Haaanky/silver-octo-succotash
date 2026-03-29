@@ -9,23 +9,20 @@ function escapeCsv(value: string | number): string {
   return s
 }
 
-export function generateCsv(): string {
-  const products = getProducts()
-  const header = 'Id,Name,Sku,Barcode,Unit,MinStock,CurrentStock'
+export async function generateCsv(): Promise<string> {
+  const products = await getProducts()
+  const header = 'id,name,sku,barcode,unit,min_stock,current_stock'
   const rows = products.map(p =>
-    [p.Id, p.Name, p.Sku, p.Barcode, p.Unit, p.MinStock, p.CurrentStock]
+    [p.id, p.name, p.sku, p.barcode, p.unit, p.min_stock, p.current_stock]
       .map(escapeCsv)
       .join(',')
   )
   return [header, ...rows].join('\n')
 }
 
-export function generateJson(): string {
-  return JSON.stringify(
-    { products: getProducts(), transactions: getTransactions() },
-    null,
-    2
-  )
+export async function generateJson(): Promise<string> {
+  const [products, transactions] = await Promise.all([getProducts(), getTransactions()])
+  return JSON.stringify({ products, transactions }, null, 2)
 }
 
 export function downloadFile(filename: string, content: string, mimeType: string): void {

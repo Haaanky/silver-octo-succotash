@@ -4,13 +4,13 @@ import { getAll, save, remove } from '../services/products'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
-const emptyForm = (): Omit<Product, 'Id'> => ({
-  Name: '',
-  Sku: '',
-  Barcode: '',
-  Unit: 'st',
-  MinStock: 0,
-  CurrentStock: 0,
+const emptyForm = (): Omit<Product, 'id' | 'created_at'> => ({
+  name: '',
+  sku: '',
+  barcode: '',
+  unit: 'st',
+  min_stock: 0,
+  current_stock: 0,
 })
 
 export default function Products() {
@@ -21,26 +21,27 @@ export default function Products() {
   const [form, setForm] = useState(emptyForm())
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (user?.Role !== 'admin') {
+    if (user?.role !== 'admin') {
       navigate('/', { replace: true })
       return
     }
-    setProducts(getAll())
+    getAll().then(setProducts)
   }, [user, navigate])
 
-  const refresh = () => setProducts(getAll())
+  const refresh = () => getAll().then(setProducts)
 
   const handleEdit = (product: Product) => {
     setEditing(product)
     setForm({
-      Name: product.Name,
-      Sku: product.Sku,
-      Barcode: product.Barcode,
-      Unit: product.Unit,
-      MinStock: product.MinStock,
-      CurrentStock: product.CurrentStock,
+      name: product.name,
+      sku: product.sku,
+      barcode: product.barcode,
+      unit: product.unit,
+      min_stock: product.min_stock,
+      current_stock: product.current_stock,
     })
     setShowForm(true)
     setError('')
@@ -60,25 +61,28 @@ export default function Products() {
     setError('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.Name.trim()) {
+    if (!form.name.trim()) {
       setError('Namn är obligatoriskt')
       return
     }
-    const product: Product = {
-      Id: editing?.Id ?? crypto.randomUUID(),
-      ...form,
+    setSaving(true)
+    try {
+      await save({ ...form, id: editing?.id })
+      await refresh()
+      handleCancel()
+    } catch {
+      setError('Kunde inte spara produkten. Försök igen.')
+    } finally {
+      setSaving(false)
     }
-    save(product)
-    refresh()
-    handleCancel()
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Är du säker på att du vill ta bort produkten?')) return
-    remove(id)
-    refresh()
+    await remove(id)
+    await refresh()
   }
 
   const field = (
@@ -121,7 +125,6 @@ export default function Products() {
         )}
       </div>
 
-      {/* Form */}
       {showForm && (
         <div className="card p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-4">
@@ -129,31 +132,28 @@ export default function Products() {
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {field('Name', 'Namn *', 'text', 'Produktnamn')}
-              {field('Sku', 'SKU', 'text', 'Artikelnummer')}
-              {field('Barcode', 'Streckkod', 'text', 'EAN/QR-kod')}
-              {field('Unit', 'Enhet', 'text', 'st, kg, l...')}
-              {field('MinStock', 'Minimilager', 'number')}
-              {!editing && field('CurrentStock', 'Startlager', 'number')}
+              {field('name', 'Namn *', 'text', 'Produktnamn')}
+              {field('sku', 'SKU', 'text', 'Artikelnummer')}
+              {field('barcode', 'Streckkod', 'text', 'EAN/QR-kod')}
+              {field('unit', 'Enhet', 'text', 'st, kg, l...')}
+              {field('min_stock', 'Minimilager', 'number')}
+              {!editing && field('current_stock', 'Startlager', 'number')}
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <div className="flex gap-3 pt-2">
               <button type="button" className="btn-secondary" onClick={handleCancel}>
                 Avbryt
               </button>
-              <button type="submit" className="btn-primary">
-                {editing ? 'Spara ändringar' : 'Skapa produkt'}
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Sparar...' : editing ? 'Spara ändringar' : 'Skapa produkt'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Table */}
       <div className="card overflow-hidden">
         {products.length === 0 ? (
           <div className="text-center py-16 text-slate-500">
@@ -170,21 +170,21 @@ export default function Products() {
                   <th className="table-header">Streckkod</th>
                   <th className="table-header">Enhet</th>
                   <th className="table-header text-right">Min</th>
-                  <th className="table-header text-right">Lager</th>
+                  <th className="table-header text-right">Saldo</th>
                   <th className="table-header text-right">Åtgärder</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {products.map(product => (
-                  <tr key={product.Id} className="hover:bg-slate-50 transition-colors">
-                    <td className="table-cell font-medium text-slate-900">{product.Name}</td>
-                    <td className="table-cell text-slate-500 font-mono text-xs">{product.Sku || '—'}</td>
-                    <td className="table-cell text-slate-500 font-mono text-xs">{product.Barcode || '—'}</td>
-                    <td className="table-cell text-slate-500">{product.Unit}</td>
-                    <td className="table-cell text-right text-slate-500">{product.MinStock}</td>
+                  <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="table-cell font-medium text-slate-900">{product.name}</td>
+                    <td className="table-cell text-slate-500 font-mono text-xs">{product.sku || '—'}</td>
+                    <td className="table-cell text-slate-500 font-mono text-xs">{product.barcode || '—'}</td>
+                    <td className="table-cell text-slate-500">{product.unit}</td>
+                    <td className="table-cell text-right text-slate-500">{product.min_stock}</td>
                     <td className="table-cell text-right font-semibold">
-                      <span className={product.CurrentStock <= product.MinStock ? 'text-amber-600' : 'text-slate-900'}>
-                        {product.CurrentStock}
+                      <span className={product.current_stock <= product.min_stock ? 'text-amber-600' : 'text-slate-900'}>
+                        {product.current_stock}
                       </span>
                     </td>
                     <td className="table-cell text-right">
@@ -196,7 +196,7 @@ export default function Products() {
                           Redigera
                         </button>
                         <button
-                          onClick={() => handleDelete(product.Id)}
+                          onClick={() => handleDelete(product.id)}
                           className="text-xs text-red-600 hover:text-red-800 font-medium"
                         >
                           Ta bort

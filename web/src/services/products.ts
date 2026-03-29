@@ -1,33 +1,54 @@
+import { supabase } from '../lib/supabase'
 import type { Product } from '../types'
-import { getItem, setItem } from './storage'
 
-const PRODUCTS_KEY = 'lager_products'
-
-export function getAll(): Product[] {
-  return getItem<Product[]>(PRODUCTS_KEY) ?? []
+export async function getAll(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('name')
+  if (error) throw error
+  return data
 }
 
-export function getById(id: string): Product | undefined {
-  return getAll().find(p => p.Id === id)
+export async function getByBarcode(barcode: string): Promise<Product | undefined> {
+  const { data: byBarcode } = await supabase
+    .from('products')
+    .select('*')
+    .eq('barcode', barcode)
+    .maybeSingle()
+  if (byBarcode) return byBarcode
+
+  const { data: bySku } = await supabase
+    .from('products')
+    .select('*')
+    .ilike('sku', barcode)
+    .maybeSingle()
+  return bySku ?? undefined
 }
 
-export function getByBarcode(barcode: string): Product | undefined {
-  return getAll().find(
-    p => p.Barcode === barcode || p.Sku.toLowerCase() === barcode.toLowerCase()
-  )
-}
-
-export function save(product: Product): void {
-  const products = getAll()
-  const idx = products.findIndex(p => p.Id === product.Id)
-  if (idx >= 0) {
-    products[idx] = product
+export async function save(product: Omit<Product, 'id' | 'created_at'> & { id?: string }): Promise<Product> {
+  if (product.id) {
+    const { id, ...fields } = product
+    const { data, error } = await supabase
+      .from('products')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   } else {
-    products.push(product)
+    const { data, error } = await supabase
+      .from('products')
+      .insert(product)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
-  setItem(PRODUCTS_KEY, products)
 }
 
-export function remove(id: string): void {
-  setItem(PRODUCTS_KEY, getAll().filter(p => p.Id !== id))
+export async function remove(id: string): Promise<void> {
+  const { error } = await supabase.from('products').delete().eq('id', id)
+  if (error) throw error
 }
