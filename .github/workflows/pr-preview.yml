@@ -32,6 +32,28 @@ jobs:
         run: |
           sed -i 's|<base href="/" />|<base href="/pr-preview/pr-${{ github.event.number }}/" />|' publish/wwwroot/index.html
 
+      - uses: actions/setup-node@v4
+        if: github.event.action != 'closed'
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install React app dependencies
+        if: github.event.action != 'closed'
+        working-directory: web
+        run: npm ci
+
+      - name: Build React app for preview path
+        if: github.event.action != 'closed'
+        working-directory: web
+        # Override the base path so all assets load correctly under the preview URL
+        run: npx vite build --base /pr-preview/pr-${{ github.event.number }}/web/
+
+      - name: Copy React app to preview /web/ subdirectory
+        if: github.event.action != 'closed'
+        run: cp -r web/dist publish/wwwroot/web
+
       - name: Add .nojekyll
         if: github.event.action != 'closed'
         run: touch publish/wwwroot/.nojekyll
@@ -41,3 +63,4 @@ jobs:
           source-dir: publish/wwwroot
           preview-branch: gh-pages
           umbrella-dir: pr-preview
+          custom-url: https://silver-octo-succotash.frisemo.dev
