@@ -1,28 +1,25 @@
-// These interfaces match the C# models with PascalCase keys (System.Text.Json default)
-// so localStorage data is shared between the Blazor and React versions.
-
 export interface User {
-  Id: string
-  Email: string
-  Role: string
-  PasswordHash: string
+  id: string
+  email: string
+  role: 'admin' | 'worker'
 }
 
 export interface Product {
-  Id: string
-  Name: string
-  Sku: string
-  Barcode: string
-  Unit: string
-  MinStock: number
-  CurrentStock: number
+  id: string
+  name: string
+  sku: string
+  barcode: string
+  unit: string
+  min_stock: number
+  current_stock: number
+  created_at?: string
 }
 
 export interface StockTransaction {
-  Id: string
-  ProductId: string
-  Type: 'in' | 'out'
-  Quantity: number
-  Timestamp: string
-  UserId: string
+  id: string
+  product_id: string
+  type: 'in' | 'out'
+  quantity: number
+  timestamp: string
+  user_id: string
 }

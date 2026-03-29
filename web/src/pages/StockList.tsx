@@ -1,32 +1,34 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { Product } from '../types'
 import { getAll } from '../services/products'
 
-function useProducts() {
-  const [products, setProducts] = useState<Product[]>(() => getAll())
-  const refresh = () => setProducts(getAll())
-  return { products, refresh }
-}
-
 export default function StockList() {
-  const { products } = useProducts()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    getAll()
+      .then(setProducts)
+      .finally(() => setLoading(false))
+  }, [])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return products.filter(
       p =>
-        p.Name.toLowerCase().includes(q) ||
-        p.Sku.toLowerCase().includes(q) ||
-        p.Barcode.toLowerCase().includes(q)
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        p.barcode.toLowerCase().includes(q)
     )
   }, [products, search])
 
-  const lowCount = products.filter(p => p.CurrentStock <= p.MinStock).length
+  const lowCount = products.filter(p => p.current_stock <= p.min_stock).length
+
+  if (loading) return <LoadingSpinner />
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Lagerlista</h1>
@@ -57,36 +59,30 @@ export default function StockList() {
         </div>
       </div>
 
-      {/* Stats row */}
       {products.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatCard label="Totalt produkter" value={products.length} />
           <StatCard
             label="OK lager"
-            value={products.filter(p => p.CurrentStock > p.MinStock).length}
+            value={products.filter(p => p.current_stock > p.min_stock).length}
             color="emerald"
           />
-          <StatCard
-            label="Lågt lager"
-            value={lowCount}
-            color={lowCount > 0 ? 'amber' : 'slate'}
-          />
+          <StatCard label="Lågt lager" value={lowCount} color={lowCount > 0 ? 'amber' : 'slate'} />
           <StatCard
             label="Tomt lager"
-            value={products.filter(p => p.CurrentStock === 0).length}
-            color={products.filter(p => p.CurrentStock === 0).length > 0 ? 'red' : 'slate'}
+            value={products.filter(p => p.current_stock === 0).length}
+            color={products.filter(p => p.current_stock === 0).length > 0 ? 'red' : 'slate'}
           />
         </div>
       )}
 
-      {/* Table */}
       <div className="card overflow-hidden">
         {filtered.length === 0 ? (
           <div className="text-center py-16">
             {products.length === 0 ? (
               <EmptyState />
             ) : (
-              <p className="text-slate-500">Inga produkter matchar sökningen "{search}"</p>
+              <p className="text-slate-500">Inga produkter hittades.</p>
             )}
           </div>
         ) : (
@@ -97,14 +93,14 @@ export default function StockList() {
                   <th className="table-header">Produkt</th>
                   <th className="table-header">SKU</th>
                   <th className="table-header">Streckkod</th>
-                  <th className="table-header text-right">Lager</th>
+                  <th className="table-header text-right">Saldo</th>
                   <th className="table-header text-right">Min</th>
                   <th className="table-header">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.map(product => (
-                  <ProductRow key={product.Id} product={product} />
+                  <ProductRow key={product.id} product={product} />
                 ))}
               </tbody>
             </table>
@@ -116,21 +112,21 @@ export default function StockList() {
 }
 
 function ProductRow({ product }: { product: Product }) {
-  const isLow = product.CurrentStock <= product.MinStock
-  const isEmpty = product.CurrentStock === 0
+  const isLow = product.current_stock <= product.min_stock
+  const isEmpty = product.current_stock === 0
 
   return (
     <tr className={`hover:bg-slate-50 transition-colors ${isLow ? 'bg-red-50/40' : ''}`}>
-      <td className="table-cell font-medium text-slate-900">{product.Name}</td>
-      <td className="table-cell text-slate-500 font-mono text-xs">{product.Sku || '—'}</td>
-      <td className="table-cell text-slate-500 font-mono text-xs">{product.Barcode || '—'}</td>
+      <td className="table-cell font-medium text-slate-900">{product.name}</td>
+      <td className="table-cell text-slate-500 font-mono text-xs">{product.sku || '—'}</td>
+      <td className="table-cell text-slate-500 font-mono text-xs">{product.barcode || '—'}</td>
       <td className="table-cell text-right font-semibold">
         <span className={isEmpty ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-slate-900'}>
-          {product.CurrentStock}
+          {product.current_stock}
         </span>
-        <span className="text-slate-400 text-xs ml-1">{product.Unit}</span>
+        <span className="text-slate-400 text-xs ml-1">{product.unit}</span>
       </td>
-      <td className="table-cell text-right text-slate-500">{product.MinStock}</td>
+      <td className="table-cell text-right text-slate-500">{product.min_stock}</td>
       <td className="table-cell">
         {isEmpty ? (
           <span className="badge-red">Tomt</span>
@@ -180,6 +176,14 @@ function EmptyState() {
         <p className="text-slate-900 font-medium">Inga produkter ännu</p>
         <p className="text-slate-500 text-sm">Lägg till produkter under Produkter-sidan</p>
       </div>
+    </div>
+  )
+}
+
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 }

@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
 
-# Switch from "GitHub Actions" Pages source to branch-based deployment so
-# that rossjrw/pr-preview-action (which also pushes to gh-pages) can coexist.
-# NOTE: In repo Settings → Pages, set source to "Deploy from branch: gh-pages".
 permissions:
   contents: write
 
@@ -20,39 +17,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.x'
-
-      - name: Publish Blazor WASM
-        run: dotnet publish LagerApp/LagerApp.csproj -c Release -o publish
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
-      - name: Install React app dependencies
+      - name: Install dependencies
         working-directory: web
         run: npm ci
 
-      - name: Build React app
+      - name: Build
         working-directory: web
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Copy React app to /web/ subdirectory
-        run: cp -r web/dist publish/wwwroot/web
-
-      - name: Add .nojekyll
-        run: touch publish/wwwroot/.nojekyll
-
-      - name: Write version file for deploy verification
-        run: echo "${{ github.sha }}" > publish/wwwroot/version.txt
+      - name: Write version file
+        run: echo "${{ github.sha }}" > web/dist/version.txt
 
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: publish/wwwroot
-          # Preserve pr-preview/ subdirectory so previews survive main deploys
+          folder: web/dist
           clean-exclude: pr-preview
           single-commit: true

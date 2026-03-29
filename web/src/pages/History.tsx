@@ -10,28 +10,38 @@ export default function History() {
   const navigate = useNavigate()
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [products, setProducts] = useState<Map<string, Product>>(new Map())
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (user?.Role !== 'admin') {
+    if (user?.role !== 'admin') {
       navigate('/', { replace: true })
       return
     }
-    setTransactions(getTransactions())
-    setProducts(new Map(getProducts().map(p => [p.Id, p])))
+    Promise.all([getTransactions(), getProducts()])
+      .then(([txs, prods]) => {
+        setTransactions(txs)
+        setProducts(new Map(prods.map(p => [p.id, p])))
+      })
+      .finally(() => setLoading(false))
   }, [user, navigate])
 
   const formatDate = (iso: string) => {
     try {
       return new Date(iso).toLocaleString('sv-SE', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
       })
     } catch {
       return iso
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -68,17 +78,17 @@ export default function History() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {transactions.map(tx => {
-                  const product = products.get(tx.ProductId)
+                  const product = products.get(tx.product_id)
                   return (
-                    <tr key={tx.Id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
                       <td className="table-cell text-slate-500 text-xs font-mono whitespace-nowrap">
-                        {formatDate(tx.Timestamp)}
+                        {formatDate(tx.timestamp)}
                       </td>
                       <td className="table-cell font-medium text-slate-900">
-                        {product?.Name ?? <span className="text-slate-400 italic">Borttagen produkt</span>}
+                        {product?.name ?? <span className="text-slate-400 italic">Borttagen produkt</span>}
                       </td>
                       <td className="table-cell">
-                        {tx.Type === 'in' ? (
+                        {tx.type === 'in' ? (
                           <span className="badge-green">
                             <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
@@ -95,11 +105,11 @@ export default function History() {
                         )}
                       </td>
                       <td className="table-cell text-right">
-                        <span className={`font-semibold ${tx.Type === 'in' ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {tx.Type === 'in' ? '+' : '−'}{tx.Quantity}
+                        <span className={`font-semibold ${tx.type === 'in' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {tx.type === 'in' ? '+' : '−'}{tx.quantity}
                         </span>
                         {product && (
-                          <span className="text-slate-400 text-xs ml-1">{product.Unit}</span>
+                          <span className="text-slate-400 text-xs ml-1">{product.unit}</span>
                         )}
                       </td>
                     </tr>

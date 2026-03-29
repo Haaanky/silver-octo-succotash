@@ -16,15 +16,16 @@ export default function Scan() {
   const [quantity, setQuantity] = useState(1)
   const [cameraError, setCameraError] = useState('')
   const [scanning, setScanning] = useState(false)
+  const [registering, setRegistering] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
   const zxingControlsRef = useRef<{ stop: () => void } | null>(null)
 
-  const handleBarcode = useCallback((code: string) => {
+  const handleBarcode = useCallback(async (code: string) => {
     setScanning(false)
     stopCamera()
-    const product = getByBarcode(code)
+    const product = await getByBarcode(code)
     if (product) {
       setFoundProduct(product)
       setUnknownBarcode('')
@@ -53,7 +54,6 @@ export default function Scan() {
       streamRef.current = stream
 
       if ('BarcodeDetector' in window) {
-        // Native path – Chrome on Android/Desktop
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
@@ -75,7 +75,6 @@ export default function Scan() {
         }
         rafRef.current = requestAnimationFrame(detect)
       } else {
-        // ZXing fallback – iOS, Firefox, and other browsers without BarcodeDetector
         const { BrowserMultiFormatReader } = await import('@zxing/browser')
         const reader = new BrowserMultiFormatReader()
         if (!videoRef.current) {
@@ -106,10 +105,15 @@ export default function Scan() {
     }
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!foundProduct || !user) return
-    register(foundProduct.Id, txType, quantity, user.Id)
-    setStep('done')
+    setRegistering(true)
+    try {
+      await register(foundProduct.id, txType, quantity, user.id)
+      setStep('done')
+    } finally {
+      setRegistering(false)
+    }
   }
 
   const reset = () => {
@@ -128,7 +132,6 @@ export default function Scan() {
         <p className="text-sm text-slate-500 mt-1">Registrera in- och utleveranser</p>
       </div>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2">
         {(['scan', 'confirm', 'done'] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
@@ -149,14 +152,8 @@ export default function Scan() {
 
       {step === 'scan' && (
         <div className="card p-6 space-y-4">
-          {/* Camera */}
           <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden relative">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-            />
+            <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
             {!scanning && !cameraError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                 <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center">
@@ -189,12 +186,11 @@ export default function Scan() {
           )}
 
           {unknownBarcode && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700" role="alert">
               Okänd streckkod: <strong>{unknownBarcode}</strong>. Ingen produkt hittades.
             </div>
           )}
 
-          {/* Manual input */}
           <div>
             <p className="text-xs text-slate-500 font-medium mb-2">Eller ange manuellt:</p>
             <form onSubmit={handleManualSubmit} className="flex gap-2">
@@ -221,9 +217,9 @@ export default function Scan() {
             </div>
             <div>
               <p className="text-xs text-slate-500 font-medium">Produkt hittad</p>
-              <p className="text-lg font-semibold text-slate-900">{foundProduct.Name}</p>
+              <p className="text-lg font-semibold text-slate-900">{foundProduct.name}</p>
               <p className="text-sm text-slate-500">
-                Nuvarande lager: <strong>{foundProduct.CurrentStock} {foundProduct.Unit}</strong>
+                Nuvarande saldo: <strong>{foundProduct.current_stock} {foundProduct.unit}</strong>
               </p>
             </div>
           </div>
@@ -231,11 +227,7 @@ export default function Scan() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Typ</label>
-              <select
-                className="input"
-                value={txType}
-                onChange={e => setTxType(e.target.value as 'in' | 'out')}
-              >
+              <select className="input" value={txType} onChange={e => setTxType(e.target.value as 'in' | 'out')}>
                 <option value="in">Inleverans (+)</option>
                 <option value="out">Utleverans (−)</option>
               </select>
@@ -253,18 +245,20 @@ export default function Scan() {
           </div>
 
           <div className="p-3 bg-slate-50 rounded-lg text-sm text-slate-600">
-            Nytt lager efter registrering:{' '}
+            Nytt saldo efter registrering:{' '}
             <strong className="text-slate-900">
               {txType === 'in'
-                ? foundProduct.CurrentStock + quantity
-                : Math.max(0, foundProduct.CurrentStock - quantity)}{' '}
-              {foundProduct.Unit}
+                ? foundProduct.current_stock + quantity
+                : Math.max(0, foundProduct.current_stock - quantity)}{' '}
+              {foundProduct.unit}
             </strong>
           </div>
 
           <div className="flex gap-3">
             <button className="btn-secondary flex-1" onClick={reset}>Avbryt</button>
-            <button className="btn-success flex-1" onClick={handleConfirm}>Registrera</button>
+            <button className="btn-success flex-1" onClick={handleConfirm} disabled={registering}>
+              {registering ? 'Registrerar...' : 'Registrera'}
+            </button>
           </div>
         </div>
       )}
@@ -279,8 +273,8 @@ export default function Scan() {
           <div>
             <p className="text-xl font-bold text-slate-900">Registrerad!</p>
             <p className="text-slate-500 text-sm mt-1">
-              {txType === 'in' ? 'Inleverans' : 'Utleverans'} av {quantity} {foundProduct?.Unit} registrerad
-              för <strong>{foundProduct?.Name}</strong>
+              {txType === 'in' ? 'Inleverans' : 'Utleverans'} av {quantity} {foundProduct?.unit} registrerad
+              för <strong>{foundProduct?.name}</strong>
             </p>
           </div>
           <button className="btn-primary" onClick={reset}>Skanna mer</button>

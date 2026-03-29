@@ -5,6 +5,7 @@ type Toast = { id: number; message: string; type: 'success' | 'info' }
 
 export default function Export() {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [loading, setLoading] = useState<'csv' | 'json' | null>(null)
 
   const addToast = (message: string, type: Toast['type'] = 'success') => {
     const id = Date.now()
@@ -12,16 +13,26 @@ export default function Export() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
   }
 
-  const handleCsv = () => {
-    const csv = generateCsv()
-    downloadFile('lager-export.csv', csv, 'text/csv;charset=utf-8;')
-    addToast('CSV-fil nedladdad!')
+  const handleCsv = async () => {
+    setLoading('csv')
+    try {
+      const csv = await generateCsv()
+      downloadFile('lager-export.csv', csv, 'text/csv;charset=utf-8;')
+      addToast('CSV-fil nedladdad!')
+    } finally {
+      setLoading(null)
+    }
   }
 
-  const handleJson = () => {
-    const json = generateJson()
-    downloadFile('lager-export.json', json, 'application/json')
-    addToast('JSON-fil nedladdad!')
+  const handleJson = async () => {
+    setLoading('json')
+    try {
+      const json = await generateJson()
+      downloadFile('lager-export.json', json, 'application/json')
+      addToast('JSON-fil nedladdad!')
+    } finally {
+      setLoading(null)
+    }
   }
 
   return (
@@ -32,7 +43,6 @@ export default function Export() {
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        {/* CSV */}
         <div className="card p-6 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -49,16 +59,15 @@ export default function Export() {
           <p className="text-sm text-slate-600">
             Exporterar alla produkter med aktuellt lagersaldo. Fungerar i Excel och Google Sheets.
           </p>
-          <button onClick={handleCsv} className="btn-success w-full">
+          <button onClick={handleCsv} className="btn-success w-full" disabled={loading === 'csv'}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Ladda ner CSV
+            {loading === 'csv' ? 'Hämtar...' : 'Ladda ner CSV'}
           </button>
         </div>
 
-        {/* JSON */}
         <div className="card p-6 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -75,29 +84,26 @@ export default function Export() {
           <p className="text-sm text-slate-600">
             Fullständig export av produkter och alla transaktioner. Lämplig för backup och systemintegration.
           </p>
-          <button onClick={handleJson} className="btn-primary w-full">
+          <button onClick={handleJson} className="btn-primary w-full" disabled={loading === 'json'}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Ladda ner JSON
+            {loading === 'json' ? 'Hämtar...' : 'Ladda ner JSON'}
           </button>
         </div>
       </div>
 
-      {/* Info */}
       <div className="card p-4 flex items-start gap-3">
         <svg className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <p className="text-sm text-slate-600">
-          All data lagras lokalt i din webbläsare. Exportera regelbundet för att säkerhetskopiera din lagerdata.
-          Data delas med Blazor-versionen av appen via samma localStorage.
+          All data lagras i Supabase. Exportera regelbundet som backup.
         </p>
       </div>
 
-      {/* Toast notifications */}
       <div className="fixed bottom-6 right-6 space-y-2 z-50">
         {toasts.map(toast => (
           <div
