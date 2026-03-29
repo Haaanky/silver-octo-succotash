@@ -63,4 +63,4 @@ jobs:
           source-dir: publish/wwwroot
           preview-branch: gh-pages
           umbrella-dir: pr-preview
-          custom-url: https://silver-octo-succotash.frisemo.dev
+          custom-url: silver-octo-succotash.frisemo.dev
