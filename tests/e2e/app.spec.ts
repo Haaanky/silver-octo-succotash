@@ -165,6 +165,41 @@ test.describe('Produkthantering', () => {
     await page.click('button:has-text("Avbryt")');
     await expect(page.locator('h2')).toHaveCount(0, { timeout: 10_000 });
   });
+
+  test('visar skanningsknappar i produktformuläret', async ({ page }) => {
+    await page.click('button:has-text("Ny produkt")');
+    await expect(page.locator('h2')).toContainText('Ny produkt');
+
+    // Barcode scan button next to the barcode field
+    const barcodeRow = page.locator('div').filter({ has: page.locator('input[placeholder="EAN/QR-kod"]') });
+    await expect(barcodeRow.locator('button[title="Skanna streckkod"]')).toBeVisible();
+
+    // Text scan buttons next to name and SKU fields
+    const nameRow = page.locator('div').filter({ has: page.locator('input[placeholder="Produktnamn"]') });
+    await expect(nameRow.locator('button[title="Skanna text från kamera"]')).toBeVisible();
+
+    const skuRow = page.locator('div').filter({ has: page.locator('input[placeholder="Artikelnummer"]') });
+    await expect(skuRow.locator('button[title="Skanna text från kamera"]')).toBeVisible();
+  });
+
+  test('öppnar och stänger skannermodalen', async ({ page }) => {
+    await page.click('button:has-text("Ny produkt")');
+    await expect(page.locator('h2')).toContainText('Ny produkt');
+
+    // Open barcode scanner modal
+    const barcodeRow = page.locator('div').filter({ has: page.locator('input[placeholder="EAN/QR-kod"]') });
+    await barcodeRow.locator('button[title="Skanna streckkod"]').click();
+
+    // Modal should appear with mode tabs and close button
+    await expect(page.locator('button:has-text("Streckkod")').last()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('button:has-text("Skanna text")').last()).toBeVisible();
+
+    // Close the modal using the aria-labeled close button
+    await page.locator('button[aria-label="Stäng scanner"]').click();
+
+    // Form should still be visible after modal is closed
+    await expect(page.locator('h2')).toContainText('Ny produkt', { timeout: 5_000 });
+  });
 });
 
 // ─── Skanna ───────────────────────────────────────────────────────────────────
