@@ -2,23 +2,35 @@
 
 ## Testning och verifiering
 
-**Alla ändringar MÅSTE verifieras med Playwright mot den RIKTIGA, deployade siten innan de anses klara.**
+**Alla ändringar MÅSTE verifieras i den deployade preview-miljön INNAN de mergas till `main`.**
+
+### ⛔ Pusha ALDRIG direkt till `main`
+
+Ändringar görs alltid via Pull Request. Direkt push till `main` är förbjudet – inte ens för "enkla" fixes eller teständringar. Anledningen är att varje merge till main triggar en deploy till produktion, och det MÅSTE verifieras i preview-miljön först.
 
 ### Obligatoriska steg för varje förändring
 
-1. **Pusha till main** – ändringar måste mergas till `main` så att GitHub Actions deployar dem.
-2. **Vänta på deployment** – kontrollera att GitHub Actions-körningen (`Deploy to GitHub Pages`) är klar.
-3. **Kör E2E-tester mot den live-deployade siten:**
+1. **Utveckla på en feature-branch** och pusha den till origin.
 
-```bash
-PLAYWRIGHT_BROWSERS_PATH=~/.cache/ms-playwright npm test
-```
+2. **Öppna en Pull Request** mot `main`. GitHub Actions kör då automatiskt `PR Preview`-workflowen och deployar en preview-version av appen till:
+   ```
+   https://silver-octo-succotash.frisemo.dev/pr-preview/pr-{nummer}/
+   ```
 
-Testerna körs alltid mot `https://silver-octo-succotash.frisemo.dev` (eller `BASE_URL` om satt).
-**Tester mot localhost eller mock-miljö räknas INTE som godkänt.**
+3. **Vänta på att preview-deployen är klar** – kontrollera att `PR Preview`-workflowen är grön i GitHub Actions.
 
-4. **Alla tester måste bli gröna** – inga failed, inga skipped som testar riktig funktionalitet.
-5. **Vid fel: fixa koden, pusha igen, vänta på ny deployment, kör testerna igen** – iterera tills allt är grönt.
+4. **Verifiera att preview-siten faktiskt fungerar** – hämta preview-URL:en med WebFetch:
+   ```
+   WebFetch: https://silver-octo-succotash.frisemo.dev/pr-preview/pr-{nummer}/
+   Prompt: Does the page load with a title and script tags? Are there asset URLs present?
+   ```
+   Sidan ska ha rätt asset-URLs (med `/pr-preview/pr-{nummer}/` som bas). Om HTML:en är tom eller saknar script-taggar är något fel med bygget.
+
+5. **Mergea PR:en till `main`** – först när preview-siten ser korrekt ut.
+
+6. **Vänta på att main-deployen är klar** – `Deploy to GitHub Pages`-workflowen ska bli grön.
+
+7. **Verifiera att E2E-testerna blir gröna i CI** – `E2E Tests`-workflowen körs automatiskt efter deploy. Kontrollera att den passerar i GitHub Actions. Om den misslyckas: läs felloggarna, fixa på feature-branch, öppna ny PR, iterera från steg 2.
 
 ### ⚠️ Viktig begränsning i Claude Code-containern
 
@@ -26,27 +38,15 @@ Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROX
 
 **Konsekvens:** `npm test` kan inte köras framgångsrikt direkt i Claude Code-containern.
 
-**Lösning – verifiera via GitHub Actions CI:**
-
-1. Mergea ändringar till `main` (se steg 1-2 ovan)
-2. GitHub Actions kör automatiskt `Deploy to GitHub Pages` → sedan `E2E Tests`
-3. Kontrollera att E2E-workflow-körningen (`E2E Tests`) är grön i GitHub Actions
-4. Om CI-testerna misslyckas: läs felloggarna, fixa koden, pusha igen, iterera
+**Verifiera alltid via GitHub Actions CI** – se steg 6–7 ovan.
 
 ### ⚠️ Gröna CI-tester räcker INTE – verifiera att siten faktiskt fungerar
 
-**Gröna tester och lyckad deployment är nödvändigt men inte tillräckligt.** Kontrollera alltid att siten verkligen fungerar i praktiken:
+**Gröna tester och lyckad deployment är nödvändigt men inte tillräckligt.** Vanliga orsaker till vit/trasig sida trots gröna tester:
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` saknas eller är tomma som GitHub Secrets → `createClient("", "")` kastar fel
+- JavaScript-kraschar under boot som inte syns i tester
 
-1. **Hämta startsidan med WebFetch** efter deployment och kontrollera att den inte är blank:
-   ```
-   WebFetch: https://silver-octo-succotash.frisemo.dev/
-   Prompt: Does the page show a login form or redirect to login? Is there any visible content or is it blank?
-   ```
-2. **Sidan ska visa inloggningsformulär** (eller omdirigera till `/#/login`) – om den är blank/vit är något trasigt.
-3. **Vanliga orsaker till vit sida:**
-   - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` saknas eller är tomma som GitHub Secrets → `createClient("", "")` kastar fel
-   - JavaScript-kraschar under boot som inte syns i tester
-4. **Om siten är vit men tester är gröna:** testerna kan misslyckas på fel nivå eller timeout:a för tidigt. Fixa grundorsaken, deploY om, verifiera igen.
+**Om siten är vit men tester är gröna:** testerna kan ha timeout:at för tidigt. Fixa grundorsaken, öppna ny PR, iterera.
 
 ### Vad testerna täcker
 
