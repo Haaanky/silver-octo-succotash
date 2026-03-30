@@ -1,5 +1,26 @@
 # LagerApp – instruktioner för Claude Code
 
+## Testdriven utveckling (TDD)
+
+**All ny funktionalitet och alla bugfixar MÅSTE utvecklas med TDD-metodik.**
+
+### TDD-arbetssätt
+
+1. **Skriv testet först** – innan du skriver implementationskoden, skriv ett Playwright-test som verifierar den önskade funktionaliteten. Testet ska misslyckas (rött) initialt.
+
+2. **Implementera minimalt** – skriv tillräckligt med kod för att testet ska bli grönt. Inget mer.
+
+3. **Refaktorera vid behov** – städa upp koden medan testerna förblir gröna.
+
+4. **Iterera tills alla tester alltid är gröna** – ingen förändring är klar förrän ALLA tester (både nya och befintliga) konsekvent passerar i CI. Om ett test misslyckas intermittent räknas det inte som godkänt – fixa grundorsaken.
+
+### ⛔ Acceptera aldrig intermittenta testfel
+
+- Tester som "ibland" misslyckas är buggar – åtgärda dem, skippa dem inte
+- Öka inte timeout:s som en quick fix utan att förstå grundorsaken
+- Ett test som skippas (`test.skip`) räknas som ett misslyckat test
+- Iterera: fixa → pusha → vänta på CI → kontrollera → upprepa tills grönt
+
 ## Testning och verifiering
 
 **Alla ändringar MÅSTE verifieras i den deployade preview-miljön INNAN de mergas till `main`.**
