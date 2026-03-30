@@ -41,7 +41,7 @@ export async function goto(page: Page, url: string) {
 }
 
 export async function loginAsAdmin(page: Page) {
-  await goto(page, '/login');
+  await goto(page, '/#/login');
   await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
   await page.fill('input[type="email"]', ADMIN.email);
   await page.fill('input[type="password"]', ADMIN.password);
