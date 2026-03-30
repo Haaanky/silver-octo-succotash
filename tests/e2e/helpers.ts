@@ -8,7 +8,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL ?? 'https://ihqqqynuqclycffgraxl.s
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 
 export const SEED_PRODUCT = {
-  id: 'test-seed-product-001',
+  id: '00000000-0000-0000-0000-000000000042',
   name: 'Testprodukt Seed',
   sku: 'SEED-001',
   barcode: '1234567890123',
