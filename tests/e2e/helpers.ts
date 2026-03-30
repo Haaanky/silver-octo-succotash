@@ -24,7 +24,8 @@ export const SEED_PRODUCT = {
 export async function seedProducts(_page: Page) {
   if (!SERVICE_ROLE_KEY) return;
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  await admin.from('products').upsert([SEED_PRODUCT], { onConflict: 'id' });
+  const { error } = await admin.from('products').upsert([SEED_PRODUCT], { onConflict: 'id' });
+  if (error) throw new Error(`seedProducts failed: ${error.message}`);
 }
 
 /**
