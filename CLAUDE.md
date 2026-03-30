@@ -17,16 +17,16 @@
    https://silver-octo-succotash.frisemo.dev/pr-preview/pr-{nummer}/
    ```
 
-3. **Vänta på att preview-deployen är klar** – kontrollera att `PR Preview`-workflowen är grön i GitHub Actions.
+3. **Vänta på att preview-deployen är klar** – kontrollera att `PR Preview`-workflowen är grön i GitHub Actions. Kort efter triggas också `E2E Tests (PR Preview)` automatiskt som kör E2E-testerna mot preview-URL:en och postar resultatet som en kommentar på PR:en (workflowen misslyckas aldrig = inga e-postnotiser).
 
-4. **Verifiera att preview-siten faktiskt fungerar** – hämta preview-URL:en med WebFetch:
+4. **Kontrollera E2E-kommentaren och preview-siten** – hämta preview-URL:en med WebFetch:
    ```
    WebFetch: https://silver-octo-succotash.frisemo.dev/pr-preview/pr-{nummer}/
    Prompt: Does the page load with a title and script tags? Are there asset URLs present?
    ```
    Sidan ska ha rätt asset-URLs (med `/pr-preview/pr-{nummer}/` som bas). Om HTML:en är tom eller saknar script-taggar är något fel med bygget.
 
-5. **Mergea PR:en till `main`** – först när preview-siten ser korrekt ut.
+5. **Mergea PR:en till `main`** – först när preview-siten ser korrekt ut OCH E2E-kommentaren på PR:en visar ✅.
 
 6. **Vänta på att main-deployen är klar** – `Deploy to GitHub Pages`-workflowen ska bli grön.
 

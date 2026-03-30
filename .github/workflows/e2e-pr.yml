@@ -1,0 +1,100 @@
+name: E2E Tests (PR Preview)
+
+# Körs automatiskt efter att PR Preview-deployen är klar.
+# Workflowen markeras ALDRIG som "failed" (continue-on-error på teststeget)
+# så att GitHub inte skickar e-postnotiser vid testfel.
+# Resultatet postas istället som en kommentar direkt på PR:en.
+
+on:
+  workflow_run:
+    workflows: ["PR Preview"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Kör bara när preview-deployen lyckades och det är en PR (inte stängd branch)
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Hitta PR-nummer utifrån branch-namn
+      - name: Hitta PR-nummer
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${{ github.event.workflow_run.head_branch }}`,
+              state: 'open'
+            });
+            return prs[0]?.number?.toString() ?? '';
+
+      - uses: actions/setup-node@v4
+        if: steps.pr.outputs.result != ''
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Installera beroenden
+        if: steps.pr.outputs.result != ''
+        run: npm ci
+
+      - name: Cache Playwright-browsers
+        if: steps.pr.outputs.result != ''
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Installera Playwright-browsers
+        if: steps.pr.outputs.result != '' && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+
+      # continue-on-error: true = jobben/workflowen misslyckas INTE vid testfel → ingen e-post
+      - name: Kör E2E-tester mot preview
+        if: steps.pr.outputs.result != ''
+        id: e2e
+        continue-on-error: true
+        run: npm test
+        env:
+          BASE_URL: https://silver-octo-succotash.frisemo.dev/pr-preview/pr-${{ steps.pr.outputs.result }}/
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Posta alltid ett resultat som kommentar på PR:en
+      - name: Kommentera resultat på PR
+        if: steps.pr.outputs.result != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = '${{ steps.e2e.outcome }}' === 'success';
+            const runUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const icon = ok ? '✅' : '❌';
+            const msg = ok
+              ? 'Alla E2E-tester gröna mot preview-miljön!'
+              : `E2E-tester misslyckades mot preview. [Se fellogg](${runUrl})`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt('${{ steps.pr.outputs.result }}'),
+              body: `${icon} **E2E (preview):** ${msg}`
+            });
+
+      - name: Ladda upp Playwright-rapport vid fel
+        if: steps.pr.outputs.result != '' && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-pr-${{ steps.pr.outputs.result }}
+          path: playwright-report/
+          retention-days: 7
