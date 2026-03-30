@@ -1,132 +1,182 @@
-# Lagerapp — Spec v2
+# LagerApp — Spec v3
 
-> Genererad: 2026-03-28  
-> Status: MVP-spec, redo för implementation
+> Uppdaterad: 2026-03-30
+> Status: MVP implementerat och i produktion
 
 ---
 
 ## Koncept
 
-En mobil- och webbapp där ett litet team skannar streckkoder/QR-koder för att registrera och hantera fysiska produkter i ett lager. Webbversionen (v0) deployas som statisk Blazor WebAssembly-app via GitHub Pages. Mobilstrategi avgörs efter MVP.
+En mobil- och webbapp där ett litet team skannar streckkoder/QR-koder för att registrera och hantera fysiska produkter i ett lager. Deployad som React-app via GitHub Pages med Supabase som backend.
 
 ---
 
-## Användare och problem
+## Användare och roller
 
-- **[Bekräftat]** Primära användare: litet team, 2–10 personer
-- **[Bekräftat]** Roller behövs — admin och lagerarbetare
-- **[Bekräftat]** Problemet: manuell eller obefintlig spårning av lagerartiklar är ineffektiv och felprone
+- **Primära användare:** litet team, 2–10 personer
+- **Admin** — hanterar produkter, ser historik, exporterar data
+- **Lagerarbetare** — registrerar in- och utleveranser via scanning
+
+Roller styrs via `profiles`-tabellen i Supabase. Navigationen filtreras per roll (Produkter och Historik visas bara för admin).
 
 ---
 
 ## Mål och framgångskriterier
 
-- **[Bekräftat]** En användare ska kunna scanna en produkt och se/uppdatera dess lagerstatus på under 5 sekunder
-- **[Rekommenderat]** Lagersaldot ska alltid reflektera senast registrerade in/ut-händelse
-- **[Rekommenderat]** Admins ska kunna se transaktionshistorik
-- **[Bekräftat]** Webb-v0 ska kunna deployas direkt till GitHub Pages utan extern serverinfrastruktur
+- En användare ska kunna scanna en produkt och registrera en leverans på under 5 sekunder
+- Lagersaldot reflekterar alltid senast registrerade händelse (uppdateras via DB-trigger)
+- Admin kan se fullständig transaktionshistorik
+- Appen är deployad som statisk app på GitHub Pages (ingen egen serverinfrastruktur)
 
 ---
 
-## Funktioner — MVP
+## Implementerade funktioner (MVP)
+
+### Auth
+- Inloggning via e-post/lösenord (Supabase Auth)
+- Sessionshantering med automatisk redirect till `/login` vid ogiltig session
+- Rollbaserad åtkomstkontroll: admin / lagerarbetare
 
 ### Scanning & registrering
-- **[Bekräftat]** Scanna streckkod/QR-kod via kameran i webbläsaren
-- **[Rekommenderat]** Registrera inleverans (öka saldo) och utleverans (minska saldo)
-- **[Rekommenderat]** Manuell sökning/inmatning som fallback om scan misslyckas
+- Kamerascanning via BarcodeDetector API (desktop/Android Chrome)
+- ZXing-fallback för iOS Safari och Chrome utan native BarcodeDetector
+- Manuell inmatning som fallback (alltid synligt)
+- Stegvis flöde: Skanna → Bekräfta (välj typ + antal) → Klar
+- Varning vid okänd streckkod
 
-### Produkthantering
-- **[Rekommenderat]** Skapa/redigera produkt med namn, SKU/streckkod, enhet, miniminivå
-- **[Rekommenderat]** Visa aktuellt saldo per produkt med varning vid lågt saldo
+### Lagerlista
+- Sökbar och filterbar produktöversikt
+- Saldostatus-indikator: OK / Lågt / Tomt
+- Statistikkort: totalt, OK, lågt, tomt
 
-### Användare & roller
-- **[Bekräftat]** Inloggning med roller: admin och lagerarbetare
-- **[Rekommenderat]** Admin hanterar produkter och användare; lagerarbetare registrerar rörelser
+### Produkthantering (admin)
+- Skapa, redigera och ta bort produkter
+- Fält: namn, SKU, streckkod, enhet, minimilager, startsaldo
+- Validering med felmeddelanden
 
-### Översikt
-- **[Rekommenderat]** Lagerlista med saldo, sökbar och filterbar
+### Transaktionshistorik (admin)
+- Kronologisk logg med tidpunkt, produkt, typ och antal
+- Visar "Ingen historik ännu" om inga transaktioner finns
 
 ### Dataexport
-- **[Bekräftat]** Export till CSV-fil — filnedladdning via JS interop i Blazor WASM
-- **[Bekräftat]** Export till JSON-fil — filnedladdning via JS interop i Blazor WASM
-- **[Bekräftat]** Mailto-funktion — öppnar mejlklient med CSV-data i kroppen via `mailto:?body=...`
-- **[Rekommenderat]** Visa varning om data överstiger mailto URL-gränsen (~2000 tecken) och hänvisa till filexport
+- CSV-nedladdning: alla produkter med aktuellt saldo
+- JSON-nedladdning: produkter + transaktioner (full backup)
+- Bekräftelsetoast efter nedladdning
 
 ---
 
-## Funktioner — Post-MVP
+## Teknikbeslut
 
-- Nativ mobilapp (MAUI eller PWA)
-- Flera lagerplatser/lokationer
-- Backend + riktig databas (ASP.NET Core + PostgreSQL/SQL Server)
-- Riktig auth (ASP.NET Core Identity + JWT)
-- Integration mot affärssystem (Fortnox, Visma)
-- Etikettgenerering (QR/streckkod)
-- Inventering (räkna om hela lagret)
-
----
-
-## Beslutsyta: teknik och arkitektur
-
-| Område | Status | Val | Motivering |
-|---|---|---|---|
-| Webb-frontend | bekräftat | Blazor WebAssembly | Enda C#-lösningen som kan deployas statiskt till GitHub Pages |
-| Mobilapp | öppet | MAUI eller PWA (Blazor) | Avgörs efter MVP — PWA snabbast, MAUI ger mer native-känsla |
-| Backend/API | öppet | Ingen i v0 — lokal state; därefter ASP.NET Core Web API | GitHub Pages har ingen server |
-| Databas | öppet | PostgreSQL eller SQL Server | Avgörs när backend tillkommer |
-| Auth | öppet | Enkel lokal auth i v0; ASP.NET Core Identity + JWT i v1 | GitHub Pages stödjer ingen serverside-auth |
-| Scanning (webb) | rekommenderat | JS interop mot `BarcodeDetector` API eller `ZXing.JS` | Kameraaccess i Blazor WASM kräver JS interop |
-| Hosting v0 | bekräftat | GitHub Pages | Statisk deploy av Blazor WASM |
-| Hosting v1+ | öppet | Azure Static Web Apps, Fly.io eller annat | Behövs när backend tillkommer |
-| Export | bekräftat | CSV + JSON via JS interop (filnedladdning) | Fungerar i statisk WASM utan backend |
-| Mailto | bekräftat | `mailto:?body=` med CSV i kroppen | Bifogade filer via data URI stöds inte av webbläsare |
+| Område | Val | Motivering |
+|---|---|---|
+| Frontend | React 18 + TypeScript + Vite | Ekosystem, prestanda, Vite-byggtid |
+| Styling | Tailwind CSS | Utility-first, inga extra beroenden |
+| Routing | React Router v6 (HashRouter) | HashRouter krävs för GitHub Pages (inga serverside-routes) |
+| Auth & databas | Supabase | Managed Postgres + auth + RLS utan egen server |
+| Scanning | BarcodeDetector API + ZXing Browser | Native API där tillgängligt, ZXing som fallback |
+| Hosting | GitHub Pages | Statisk deploy, gratis, CNAME-stöd |
+| E2E-testning | Playwright + Chromium | Kör mot live-URL, täcker hela användarflödet |
 
 ---
 
 ## Datamodell
 
-> I v0 lagras all data i `localStorage`. Ingen synk mellan användare eller enheter.
+```sql
+-- Supabase Auth hanterar auth.users (e-post, lösenord, session)
 
-```jsonc
-{
-  "Product": {
-    "id": "uuid",
-    "name": "Skruv M6",
-    "sku": "SKU-001",        // används som sök-nyckel
-    "barcode": "7312345...", // skannat värde
-    "unit": "st",
-    "minStock": 50,          // larmgräns
-    "currentStock": 142
-  },
-  "StockTransaction": {
-    "id": "uuid",
-    "productId": "uuid",
-    "type": "in" | "out",
-    "quantity": 10,
-    "timestamp": "ISO8601",
-    "userId": "uuid"
-  },
-  "User": {
-    "id": "uuid",
-    "email": "...",
-    "role": "admin" | "worker",
-    "passwordHash": "..."    // enkel lokal hash i v0, ersätts av riktig auth i v1
-  }
-}
+profiles (
+  id          uuid  PK → auth.users
+  email       text
+  role        text  CHECK ('admin' | 'worker')  DEFAULT 'worker'
+)
+
+products (
+  id            uuid        PK  DEFAULT gen_random_uuid()
+  name          text        NOT NULL
+  sku           text        DEFAULT ''
+  barcode       text        DEFAULT ''
+  unit          text        DEFAULT 'st'
+  min_stock     integer     DEFAULT 0
+  current_stock integer     DEFAULT 0
+  created_at    timestamptz DEFAULT now()
+)
+
+stock_transactions (
+  id          uuid        PK  DEFAULT gen_random_uuid()
+  product_id  uuid        FK → products
+  type        text        CHECK ('in' | 'out')
+  quantity    integer     > 0
+  timestamp   timestamptz DEFAULT now()
+  user_id     uuid        FK → auth.users
+)
+```
+
+**Trigger:** `after_transaction_insert` uppdaterar `products.current_stock` automatiskt vid varje ny transaktion.
+
+**RLS-policys:**
+- Alla inloggade: läsa produkter, transaktioner och profiler
+- Bara admin: skriva/uppdatera/ta bort produkter
+- Inloggad user: insertar bara transaktioner med eget `user_id`
+
+---
+
+## Arkitektur
+
+```
+Browser (HashRouter)
+└── React App
+    ├── AuthContext          ← Supabase-session, profil, roll
+    ├── Layout + NavBar      ← Skyddad route, rollfiltrerad nav
+    └── Pages
+        ├── Login            ← Supabase signInWithPassword
+        ├── StockList        ← products.getAll()
+        ├── Scan             ← BarcodeDetector / ZXing → transactions.register()
+        ├── Products         ← products CRUD (admin only)
+        ├── History          ← transactions.getAll() (admin only)
+        └── Export           ← CSV/JSON via Blob + anchor-click
+
+Supabase
+├── Auth           ← Session, JWT
+├── PostgreSQL     ← products, stock_transactions, profiles
+└── RLS            ← Policys per tabell och roll
 ```
 
 ---
 
-## Risker och öppna frågor
+## CI/CD-flöde
 
-- **[Öppet]** v0 är single-device — localStorage delas inte mellan användare eller enheter
-- **[Öppet]** Blazor WASM + kameraaccess kräver JS interop för scanning — välj bibliotek tidigt
-- **[Öppet]** Auth i v0 är lokal/falsk — migreringsväg till riktig auth i v1 måste planeras
-- **[Öppet]** Mobilstrategi olöst — PWA från Blazor-appen är snabbaste vägen
-- **[Bekräftat]** Mailto + bifogad fil via data URI stöds inte av webbläsare — filnedladdning är primär exportväg
+```
+feature-branch
+    │
+    ├─► PR öppnad
+    │       └─► PR Preview → deploys till /pr-preview/pr-{N}/
+    │       └─► E2E Tests (PR Preview) → kör tester, postar ✅/❌ på PR
+    │
+    ├─► Merge till main (efter ✅ preview + ✅ E2E-kommentar)
+    │       └─► Deploy to GitHub Pages → production
+    │       └─► E2E Tests → verifierar produktion
+    │
+    └─► Klar
+```
+
+Direkt push till `main` är förbjudet. Se `CLAUDE.md` för fullständiga instruktioner.
 
 ---
 
-## Nästa rekommenderade iteration
+## Begränsningar
 
-Sätt upp Blazor WASM-projektet med GitHub Pages-deploy och en fungerande scan-komponent. Kameraaccess via JS interop är den högsta tekniska risken och bör valideras innan övrig MVP byggs.
+- BarcodeDetector API saknas i Firefox och äldre Safari — ZXing-fallback täcker dessa
+- HashRouter gör att URL:er inte är direktlänkbara som vanliga paths (men 404.html-trick löser SPA-routing på GitHub Pages)
+- Supabase free tier har pausregler vid inaktivitet — inte lämpligt för produktion utan uppgradering
+
+---
+
+## Post-MVP (möjliga nästa steg)
+
+- PWA / installationsbar app med offlinestöd
+- Push-notiser vid lågt lager
+- Flera lagerplatser/lokationer
+- Inventering (fysisk räkning mot systemsaldo)
+- Integration mot affärssystem (Fortnox, Visma)
+- Etikettgenerering (QR/streckkod)
+- Mobilapp (React Native eller PWA)
