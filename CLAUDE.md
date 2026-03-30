@@ -22,7 +22,7 @@ Testerna körs alltid mot `https://silver-octo-succotash.frisemo.dev` (eller `BA
 
 ### ⚠️ Viktig begränsning i Claude Code-containern
 
-Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROXY` / `HTTP_PROXY` är satta). Headless Chromium laddar ner alla WASM-resurser men .NET-runtimen exekverar aldrig C#-koden fullt ut i denna miljö (troligen p.g.a. att proxy-SSL-interceptionen påverkar WASM-exekveringen).
+Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROXY` / `HTTP_PROXY` är satta). Chromium kan inte köra mot den live-deployade siten inifrån containern.
 
 **Konsekvens:** `npm test` kan inte köras framgångsrikt direkt i Claude Code-containern.
 
@@ -33,7 +33,20 @@ Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROX
 3. Kontrollera att E2E-workflow-körningen (`E2E Tests`) är grön i GitHub Actions
 4. Om CI-testerna misslyckas: läs felloggarna, fixa koden, pusha igen, iterera
 
-GitHub Actions-miljön har ingen proxy och Chromium kan köra .NET WASM normalt där.
+### ⚠️ Gröna CI-tester räcker INTE – verifiera att siten faktiskt fungerar
+
+**Gröna tester och lyckad deployment är nödvändigt men inte tillräckligt.** Kontrollera alltid att siten verkligen fungerar i praktiken:
+
+1. **Hämta startsidan med WebFetch** efter deployment och kontrollera att den inte är blank:
+   ```
+   WebFetch: https://silver-octo-succotash.frisemo.dev/
+   Prompt: Does the page show a login form or redirect to login? Is there any visible content or is it blank?
+   ```
+2. **Sidan ska visa inloggningsformulär** (eller omdirigera till `/#/login`) – om den är blank/vit är något trasigt.
+3. **Vanliga orsaker till vit sida:**
+   - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` saknas eller är tomma som GitHub Secrets → `createClient("", "")` kastar fel
+   - JavaScript-kraschar under boot som inte syns i tester
+4. **Om siten är vit men tester är gröna:** testerna kan misslyckas på fel nivå eller timeout:a för tidigt. Fixa grundorsaken, deploY om, verifiera igen.
 
 ### Vad testerna täcker
 
