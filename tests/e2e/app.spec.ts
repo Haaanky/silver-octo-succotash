@@ -14,7 +14,7 @@ test.describe('Inloggningssida', () => {
   });
 
   test('visar felmeddelande vid fel lösenord', async ({ page }) => {
-    await goto(page, '/login');
+    await goto(page, '/#/login');
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
     await page.fill('input[type="email"]', ADMIN.email);
     await page.fill('input[type="password"]', 'felaktigt');
@@ -304,7 +304,7 @@ test.describe('Export', () => {
 
 test.describe('Sessionshantering', () => {
   test('skyddad sida utan session omdirigerar till /login', async ({ page }) => {
-    await goto(page, '/products');
+    await goto(page, '/#/products');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 30_000 });
   });
 
@@ -312,7 +312,7 @@ test.describe('Sessionshantering', () => {
     await loginAsAdmin(page);
     await page.click('button:has-text("Logga ut")');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 15_000 });
-    await goto(page, '/products');
+    await goto(page, '/#/products');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 15_000 });
   });
 });
