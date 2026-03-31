@@ -69,6 +69,23 @@ Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROX
 
 **Om siten är vit men tester är gröna:** testerna kan ha timeout:at för tidigt. Fixa grundorsaken, öppna ny PR, iterera.
 
+### ⚠️ GitHub Actions – hemligheter är miljöbegränsade
+
+`VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY` är lagrade som **miljöhemligheter** under GitHub-miljön `Supabase` (inte som repository-hemligheter). Det innebär att **alla jobb som behöver dessa hemligheter måste deklarera `environment: Supabase`**, annars blir värdena tomma strängar och appen kraschar vid start.
+
+**Regel:** Varje nytt GitHub Actions-jobb som bygger eller kör appen och behöver Supabase-credentials MÅSTE ha:
+```yaml
+jobs:
+  ditt-jobb:
+    environment: Supabase
+```
+
+Befintliga jobb med `environment: Supabase`:
+- `deploy.yml` → `deploy`-jobbet
+- `pr-preview.yml` → `preview`-jobbet
+
+**Symptom om `environment: Supabase` saknas:** Appen byggs utan Supabase-URL → blank sida i preview → ALLA E2E-tester timeout:ar (~30 min körtid). Verifiera felet genom att hämta JS-bundeln och söka efter Supabase-URL:en – om den saknas är det detta problem.
+
 ### Vad testerna täcker
 
 Testerna i `tests/e2e/app.spec.ts` verifierar att följande faktiskt fungerar i produktion:
