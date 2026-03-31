@@ -16,6 +16,38 @@ const emptyForm = (): Omit<Product, 'id' | 'created_at'> => ({
 
 type ScanTarget = 'barcode' | 'text-name' | 'text-sku'
 
+function ScanButton({
+  target,
+  mode,
+  onScan,
+}: {
+  target: ScanTarget
+  mode: 'barcode' | 'text'
+  onScan: (target: ScanTarget) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onScan(target)}
+      title={mode === 'barcode' ? 'Skanna streckkod' : 'Skanna text från kamera'}
+      className="shrink-0 p-2 rounded-lg border border-slate-300 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-400 transition-colors"
+    >
+      {mode === 'barcode' ? (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            d="M3 9V6a3 3 0 013-3h2M3 15v3a3 3 0 003 3h2m10-18h2a3 3 0 013 3v3m0 6v3a3 3 0 01-3 3h-2M9 9h6v6H9z" />
+        </svg>
+      ) : (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 export default function Products() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -113,34 +145,6 @@ export default function Products() {
     }
   }
 
-  const ScanButton = ({
-    target,
-    mode,
-  }: {
-    target: ScanTarget
-    mode: 'barcode' | 'text'
-  }) => (
-    <button
-      type="button"
-      onClick={() => setScanTarget(target)}
-      title={mode === 'barcode' ? 'Skanna streckkod' : 'Skanna text från kamera'}
-      className="shrink-0 p-2 rounded-lg border border-slate-300 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-400 transition-colors"
-    >
-      {mode === 'barcode' ? (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M3 9V6a3 3 0 013-3h2M3 15v3a3 3 0 003 3h2m10-18h2a3 3 0 013 3v3m0 6v3a3 3 0 01-3 3h-2M9 9h6v6H9z" />
-        </svg>
-      ) : (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      )}
-    </button>
-  )
-
   return (
     <div className="space-y-6">
       {scanTarget && (
@@ -185,7 +189,7 @@ export default function Products() {
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   />
-                  <ScanButton target="text-name" mode="text" />
+                  <ScanButton target="text-name" mode="text" onScan={setScanTarget} />
                 </div>
               </div>
 
@@ -200,7 +204,7 @@ export default function Products() {
                     value={form.sku}
                     onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
                   />
-                  <ScanButton target="text-sku" mode="text" />
+                  <ScanButton target="text-sku" mode="text" onScan={setScanTarget} />
                 </div>
               </div>
 
@@ -215,7 +219,7 @@ export default function Products() {
                     value={form.barcode}
                     onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
                   />
-                  <ScanButton target="barcode" mode="barcode" />
+                  <ScanButton target="barcode" mode="barcode" onScan={setScanTarget} />
                 </div>
               </div>
 

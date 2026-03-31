@@ -170,35 +170,35 @@ test.describe('Produkthantering', () => {
     await page.click('button:has-text("Ny produkt")');
     await expect(page.locator('h2')).toContainText('Ny produkt');
 
-    // Barcode scan button next to the barcode field
-    const barcodeRow = page.locator('div').filter({ has: page.locator('input[placeholder="EAN/QR-kod"]') });
-    await expect(barcodeRow.locator('button[title="Skanna streckkod"]')).toBeVisible();
+    // Barcode scan button (unique title)
+    await expect(page.locator('button[title="Skanna streckkod"]')).toBeVisible();
 
-    // Text scan buttons next to name and SKU fields
-    const nameRow = page.locator('div').filter({ has: page.locator('input[placeholder="Produktnamn"]') });
-    await expect(nameRow.locator('button[title="Skanna text från kamera"]')).toBeVisible();
-
-    const skuRow = page.locator('div').filter({ has: page.locator('input[placeholder="Artikelnummer"]') });
-    await expect(skuRow.locator('button[title="Skanna text från kamera"]')).toBeVisible();
+    // Two text scan buttons – one for name, one for SKU
+    await expect(page.locator('button[title="Skanna text från kamera"]').first()).toBeVisible();
+    await expect(page.locator('button[title="Skanna text från kamera"]')).toHaveCount(2);
   });
 
   test('öppnar och stänger skannermodalen', async ({ page }) => {
     await page.click('button:has-text("Ny produkt")');
     await expect(page.locator('h2')).toContainText('Ny produkt');
 
-    // Open barcode scanner modal
-    const barcodeRow = page.locator('div').filter({ has: page.locator('input[placeholder="EAN/QR-kod"]') });
-    await barcodeRow.locator('button[title="Skanna streckkod"]').click();
+    // Open barcode scanner modal via the scan button
+    await page.locator('button[title="Skanna streckkod"]').click();
 
-    // Modal should appear with mode tabs and close button
-    await expect(page.locator('button:has-text("Streckkod")').last()).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('button:has-text("Skanna text")').last()).toBeVisible();
+    // Modal should appear – the close button has a unique aria-label
+    await expect(page.locator('button[aria-label="Stäng scanner"]')).toBeVisible({ timeout: 5_000 });
 
-    // Close the modal using the aria-labeled close button
+    // Mode tabs are visible inside the modal overlay
+    const modal = page.locator('.fixed.inset-0');
+    await expect(modal.locator('button:has-text("Streckkod")')).toBeVisible();
+    await expect(modal.locator('button:has-text("Skanna text")')).toBeVisible();
+
+    // Close the modal
     await page.locator('button[aria-label="Stäng scanner"]').click();
 
-    // Form should still be visible after modal is closed
-    await expect(page.locator('h2')).toContainText('Ny produkt', { timeout: 5_000 });
+    // Form should still be visible; modal is gone
+    await expect(page.locator('button[aria-label="Stäng scanner"]')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('h2')).toContainText('Ny produkt');
   });
 });
 
