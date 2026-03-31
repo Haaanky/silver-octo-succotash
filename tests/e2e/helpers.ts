@@ -38,7 +38,10 @@ export async function cleanupSeedProducts() {
 }
 
 export async function goto(page: Page, url: string) {
-  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  // Convert absolute paths (e.g. '/#/login') to base-relative paths ('./#/login')
+  // so navigation stays within the preview sub-path when BASE_URL includes one.
+  const resolved = url.startsWith('/') ? '.' + url : url;
+  await page.goto(resolved, { waitUntil: 'domcontentloaded' });
 }
 
 export async function loginAsAdmin(page: Page) {
