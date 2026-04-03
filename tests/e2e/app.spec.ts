@@ -232,7 +232,6 @@ test.describe('Skanna / Transaktioner', () => {
     await page.click('button:has-text("Sök")');
 
     await expect(page.getByText('Produkt hittad')).toBeVisible({ timeout: 15_000 });
-    await page.selectOption('select', 'in');
     await page.fill('input[type="number"]', '5');
     await page.click('button:has-text("Registrera")');
 
