@@ -20,10 +20,11 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60_000,
   retries: 1,
+  reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
     baseURL: process.env.BASE_URL ?? 'https://silver-octo-succotash.frisemo.dev',
     screenshot: 'only-on-failure',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     navigationTimeout: 60_000,
     actionTimeout: 15_000,
     proxy: getProxy(),
