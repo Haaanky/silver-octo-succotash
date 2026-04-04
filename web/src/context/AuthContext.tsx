@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
 import type { User } from '../types'
 import { supabase } from '../lib/supabase'
 
@@ -23,6 +23,9 @@ async function fetchProfile(userId: string): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  // Track intentional sign-out so we can distinguish it from spurious SIGNED_OUT
+  // events that Supabase fires when a token refresh fails (common in CI/preview).
+  const intendedSignOut = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -33,14 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         if (profile) setUser(profile)
+      } else if (event === 'SIGNED_OUT' && intendedSignOut.current) {
+        // Only clear user on an intentional logout, not on spurious SIGNED_OUT
+        // (e.g. from a failed token refresh in CI / unstable networks).
+        setUser(null)
       }
-      // Do NOT clear user on SIGNED_OUT here: the event can fire spuriously when
-      // Supabase fails to refresh the access token (e.g. transient network error in CI).
-      // User is cleared explicitly in logout() and on initial load via getSession().
     })
 
     return () => subscription.unsubscribe()
@@ -52,8 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    intendedSignOut.current = true
     await supabase.auth.signOut()
+    // Fallback: ensure user is cleared even if the SIGNED_OUT event already did it.
     setUser(null)
+    intendedSignOut.current = false
   }
 
   return (

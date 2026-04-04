@@ -40,11 +40,23 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
     setCameraError('')
     setScanning(true)
     setOcrLines([])
+    let stream: MediaStream
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       })
-      streamRef.current = stream
+    } catch {
+      setCameraError('Kunde inte komma åt kameran.')
+      setScanning(false)
+      return
+    }
+    // Guard: if modal was closed while permission prompt was open, stop immediately
+    if (!streamRef.current && !videoRef.current) {
+      stream.getTracks().forEach(t => t.stop())
+      return
+    }
+    streamRef.current = stream
+    try {
 
       if (newMode === 'barcode') {
         if ('BarcodeDetector' in window) {
@@ -127,12 +139,13 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
   }
 
   const switchMode = (newMode: ScanMode) => {
+    const wasScanning = scanning
     stopCamera()
     setScanning(false)
     setOcrLines([])
     setCameraError('')
     setMode(newMode)
-    startCamera(newMode)
+    if (wasScanning) startCamera(newMode)
   }
 
   const handleClose = () => {

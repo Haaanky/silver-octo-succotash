@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Product } from '../types'
 import { getAll, save, remove } from '../services/products'
 import { useAuth } from '../context/AuthContext'
@@ -59,6 +59,11 @@ export default function Products() {
   const [saving, setSaving] = useState(false)
   const [scanTarget, setScanTarget] = useState<ScanTarget | null>(null)
   const [scanFlash, setScanFlash] = useState<keyof typeof form | null>(null)
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current) }
+  }, [])
 
   useEffect(() => {
     if (user?.role !== 'admin') {
@@ -123,8 +128,9 @@ export default function Products() {
   }
 
   const flashField = (key: keyof typeof form) => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
     setScanFlash(key)
-    setTimeout(() => setScanFlash(null), 1200)
+    flashTimerRef.current = setTimeout(() => setScanFlash(null), 1200)
   }
 
   const handleBarcodeScanned = (code: string) => {
