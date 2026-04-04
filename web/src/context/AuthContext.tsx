@@ -33,13 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
-      } else if (session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         if (profile) setUser(profile)
       }
+      // Do NOT clear user on SIGNED_OUT here: the event can fire spuriously when
+      // Supabase fails to refresh the access token (e.g. transient network error in CI).
+      // User is cleared explicitly in logout() and on initial load via getSession().
     })
 
     return () => subscription.unsubscribe()
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await supabase.auth.signOut()
+    setUser(null)
   }
 
   return (
