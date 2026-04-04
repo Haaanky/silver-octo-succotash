@@ -26,6 +26,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Track intentional sign-out so we can distinguish it from spurious SIGNED_OUT
   // events that Supabase fires when a token refresh fails (common in CI/preview).
   const intendedSignOut = useRef(false)
+  // Monotonically increasing counter – used to ignore stale fetchProfile results
+  // when multiple auth-state-change events fire in rapid succession.
+  const authSeqRef = useRef(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -37,9 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const seq = ++authSeqRef.current
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        if (profile) setUser(profile)
+        // Ignore stale results if a newer auth event has already taken effect
+        if (seq === authSeqRef.current && profile) setUser(profile)
       } else if (event === 'SIGNED_OUT') {
         if (intendedSignOut.current) {
           // Intentional logout – clear user immediately
@@ -49,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Re-check the actual session: if it's gone, clear user; otherwise keep it.
           const { data: { session: currentSession } } = await supabase.auth.getSession()
           if (!currentSession) setUser(null)
+          // else: session is still valid – keep the current user state as-is
         }
       }
     })

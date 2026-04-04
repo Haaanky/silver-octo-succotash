@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 export const ADMIN = { email: 'admin@lager.se', password: 'admin123' };
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ihqqqynuqclycffgraxl.supabase.co';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-const ANON_KEY = process.env.SUPABASE_ANON_KEY ?? '';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
 export const SEED_PRODUCT = {
   id: '00000000-0000-0000-0000-000000000042',
