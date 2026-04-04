@@ -40,10 +40,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         if (profile) setUser(profile)
-      } else if (event === 'SIGNED_OUT' && intendedSignOut.current) {
-        // Only clear user on an intentional logout, not on spurious SIGNED_OUT
-        // (e.g. from a failed token refresh in CI / unstable networks).
-        setUser(null)
+      } else if (event === 'SIGNED_OUT') {
+        if (intendedSignOut.current) {
+          // Intentional logout – clear user immediately
+          setUser(null)
+        } else {
+          // Spurious SIGNED_OUT (e.g. failed token refresh in CI).
+          // Re-check the actual session: if it's gone, clear user; otherwise keep it.
+          const { data: { session: currentSession } } = await supabase.auth.getSession()
+          if (!currentSession) setUser(null)
+        }
       }
     })
 

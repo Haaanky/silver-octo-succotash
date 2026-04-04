@@ -111,9 +111,10 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
 
   const captureAndOCR = async () => {
     if (!videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return
     setProcessing(true)
     setOcrLines([])
-    const video = videoRef.current
     const canvas = canvasRef.current
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
@@ -154,7 +155,12 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Kamerascanner"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-black/60">
         <div className="flex gap-1 p-1 bg-white/10 rounded-xl">
