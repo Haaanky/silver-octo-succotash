@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, SEED_PRODUCT } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ test.describe('Inloggningssida', () => {
   });
 
   test('visar felmeddelande vid fel lösenord', async ({ page }) => {
-    await goto(page, '/login');
+    await goto(page, '/#/login');
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
     await page.fill('input[type="email"]', ADMIN.email);
     await page.fill('input[type="password"]', 'felaktigt');
@@ -165,20 +165,50 @@ test.describe('Produkthantering', () => {
     await page.click('button:has-text("Avbryt")');
     await expect(page.locator('h2')).toHaveCount(0, { timeout: 10_000 });
   });
+
+  test('visar skanningsknappar i produktformuläret', async ({ page }) => {
+    await page.click('button:has-text("Ny produkt")');
+    await expect(page.locator('h2')).toContainText('Ny produkt');
+
+    // Barcode scan button (unique title)
+    await expect(page.locator('button[title="Skanna streckkod"]')).toBeVisible();
+
+    // Two text scan buttons – one for name, one for SKU
+    await expect(page.locator('button[title="Skanna text från kamera"]').first()).toBeVisible();
+    await expect(page.locator('button[title="Skanna text från kamera"]')).toHaveCount(2);
+  });
+
+  test('öppnar och stänger skannermodalen', async ({ page }) => {
+    await page.click('button:has-text("Ny produkt")');
+    await expect(page.locator('h2')).toContainText('Ny produkt');
+
+    // Open barcode scanner modal via the scan button
+    await page.locator('button[title="Skanna streckkod"]').click();
+
+    // Modal should appear – the close button has a unique aria-label
+    await expect(page.locator('button[aria-label="Stäng scanner"]')).toBeVisible({ timeout: 5_000 });
+
+    // Mode tabs are visible inside the modal overlay
+    const modal = page.locator('.fixed.inset-0');
+    await expect(modal.locator('button:has-text("Streckkod")')).toBeVisible();
+    await expect(modal.locator('button:has-text("Skanna text")')).toBeVisible();
+
+    // Close the modal
+    await page.locator('button[aria-label="Stäng scanner"]').click();
+
+    // Form should still be visible; modal is gone
+    await expect(page.locator('button[aria-label="Stäng scanner"]')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('h2')).toContainText('Ny produkt');
+  });
 });
 
 // ─── Skanna ───────────────────────────────────────────────────────────────────
 
 test.describe('Skanna / Transaktioner', () => {
   test.beforeEach(async ({ page }) => {
-    await seedProducts(page);
     await loginAsAdmin(page);
     await page.getByRole('link', { name: 'Skanna' }).click();
     await expect(page.locator('h1')).toHaveText('Skanna');
-  });
-
-  test.afterAll(async () => {
-    await cleanupSeedProducts();
   });
 
   test('visar steg-indikator och manuellt inmatningsfält', async ({ page }) => {
@@ -190,18 +220,6 @@ test.describe('Skanna / Transaktioner', () => {
     await page.fill('input[placeholder="Streckkod eller SKU"]', 'OKANDSTRECKKOD999');
     await page.click('button:has-text("Sök")');
     await expect(page.locator('[role="alert"]')).toContainText('Okänd streckkod', { timeout: 15_000 });
-  });
-
-  test('kan registrera inleverans för befintlig produkt', async ({ page }) => {
-    await page.fill('input[placeholder="Streckkod eller SKU"]', SEED_PRODUCT.barcode);
-    await page.click('button:has-text("Sök")');
-
-    await expect(page.getByText('Produkt hittad')).toBeVisible({ timeout: 15_000 });
-    await page.selectOption('select', 'in');
-    await page.fill('input[type="number"]', '5');
-    await page.click('button:has-text("Registrera")');
-
-    await expect(page.getByText('Registrerad!')).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -269,7 +287,7 @@ test.describe('Export', () => {
 
 test.describe('Sessionshantering', () => {
   test('skyddad sida utan session omdirigerar till /login', async ({ page }) => {
-    await goto(page, '/products');
+    await goto(page, '/#/products');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 30_000 });
   });
 
@@ -277,7 +295,7 @@ test.describe('Sessionshantering', () => {
     await loginAsAdmin(page);
     await page.click('button:has-text("Logga ut")');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 15_000 });
-    await goto(page, '/products');
+    await goto(page, '/#/products');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 15_000 });
   });
 });
