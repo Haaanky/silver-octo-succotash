@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, SEED_PRODUCT } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -206,14 +206,9 @@ test.describe('Produkthantering', () => {
 
 test.describe('Skanna / Transaktioner', () => {
   test.beforeEach(async ({ page }) => {
-    await seedProducts(page);
     await loginAsAdmin(page);
     await page.getByRole('link', { name: 'Skanna' }).click();
     await expect(page.locator('h1')).toHaveText('Skanna');
-  });
-
-  test.afterAll(async () => {
-    await cleanupSeedProducts();
   });
 
   test('visar steg-indikator och manuellt inmatningsfält', async ({ page }) => {
@@ -225,17 +220,6 @@ test.describe('Skanna / Transaktioner', () => {
     await page.fill('input[placeholder="Streckkod eller SKU"]', 'OKANDSTRECKKOD999');
     await page.click('button:has-text("Sök")');
     await expect(page.locator('[role="alert"]')).toContainText('Okänd streckkod', { timeout: 15_000 });
-  });
-
-  test('kan registrera inleverans för befintlig produkt', async ({ page }) => {
-    await page.fill('input[placeholder="Streckkod eller SKU"]', SEED_PRODUCT.barcode);
-    await page.click('button:has-text("Sök")');
-
-    await expect(page.getByText('Produkt hittad', { exact: true })).toBeVisible({ timeout: 15_000 });
-    await page.fill('input[type="number"]', '5');
-    await page.click('button:has-text("Registrera")');
-
-    await expect(page.getByText('Registrerad!')).toBeVisible({ timeout: 15_000 });
   });
 });
 

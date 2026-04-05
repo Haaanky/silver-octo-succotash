@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import type * as TesseractType from 'tesseract.js'
 
 type ScanMode = 'barcode' | 'text'
 
@@ -20,6 +21,8 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
   const zxingControlsRef = useRef<{ stop: () => void } | null>(null)
+  // Lazy Tesseract worker – created on first OCR use, reused across captures, terminated on unmount
+  const ocrWorkerRef = useRef<TesseractType.Worker | null>(null)
 
   const stopCamera = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
@@ -29,7 +32,11 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
     streamRef.current = null
   }, [])
 
-  useEffect(() => () => stopCamera(), [stopCamera])
+  useEffect(() => () => {
+    stopCamera()
+    ocrWorkerRef.current?.terminate()
+    ocrWorkerRef.current = null
+  }, [stopCamera])
 
   const handleBarcodeFound = useCallback((code: string) => {
     stopCamera()
@@ -111,18 +118,21 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
 
   const captureAndOCR = async () => {
     if (!videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return
     setProcessing(true)
     setOcrLines([])
-    const video = videoRef.current
     const canvas = canvasRef.current
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d')?.drawImage(video, 0, 0)
     try {
       const { createWorker } = await import('tesseract.js')
-      const worker = await createWorker('eng')
-      const { data } = await worker.recognize(canvas)
-      await worker.terminate()
+      // Lazily create the worker on first use and reuse it across captures
+      if (!ocrWorkerRef.current) {
+        ocrWorkerRef.current = await createWorker('eng')
+      }
+      const { data } = await ocrWorkerRef.current.recognize(canvas)
       const lines = data.text
         .split('\n')
         .map((l: string) => l.trim())
@@ -154,7 +164,12 @@ export default function ProductScannerModal({ initialMode = 'barcode', onBarcode
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Kamerascanner"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-black/60">
         <div className="flex gap-1 p-1 bg-white/10 rounded-xl">

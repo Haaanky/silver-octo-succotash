@@ -30,6 +30,7 @@ function ScanButton({
       type="button"
       onClick={() => onScan(target)}
       title={mode === 'barcode' ? 'Skanna streckkod' : 'Skanna text från kamera'}
+      aria-label={mode === 'barcode' ? 'Skanna streckkod' : 'Skanna text från kamera'}
       className="shrink-0 p-2 rounded-lg border border-slate-300 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-400 transition-colors"
     >
       {mode === 'barcode' ? (
