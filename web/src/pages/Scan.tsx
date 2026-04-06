@@ -17,6 +17,7 @@ export default function Scan() {
   const [cameraError, setCameraError] = useState('')
   const [scanning, setScanning] = useState(false)
   const [registering, setRegistering] = useState(false)
+  const [registerError, setRegisterError] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
@@ -108,9 +109,12 @@ export default function Scan() {
   const handleConfirm = async () => {
     if (!foundProduct || !user) return
     setRegistering(true)
+    setRegisterError('')
     try {
       await register(foundProduct.id, txType, quantity, user.id)
       setStep('done')
+    } catch (e) {
+      setRegisterError(e instanceof Error ? e.message : 'Okänt fel vid registrering')
     } finally {
       setRegistering(false)
     }
@@ -123,6 +127,7 @@ export default function Scan() {
     setQuantity(1)
     setTxType('in')
     setCameraError('')
+    setRegisterError('')
   }
 
   return (
@@ -253,6 +258,12 @@ export default function Scan() {
               {foundProduct.unit}
             </strong>
           </div>
+
+          {registerError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700" role="alert">
+              {registerError}
+            </div>
+          )}
 
           <div className="flex gap-3">
             <button className="btn-secondary flex-1" onClick={reset}>Avbryt</button>

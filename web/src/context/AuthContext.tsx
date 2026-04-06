@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
 import type { User } from '../types'
 import { supabase } from '../lib/supabase'
 
@@ -23,6 +23,12 @@ async function fetchProfile(userId: string): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  // Track intentional sign-out so we can distinguish it from spurious SIGNED_OUT
+  // events that Supabase fires when a token refresh fails (common in CI/preview).
+  const intendedSignOut = useRef(false)
+  // Monotonically increasing counter – used to ignore stale fetchProfile results
+  // when multiple auth-state-change events fire in rapid succession.
+  const authSeqRef = useRef(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -33,12 +39,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const seq = ++authSeqRef.current
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        setUser(profile)
-      } else {
-        setUser(null)
+        // Ignore stale results if a newer auth event has already taken effect
+        if (seq === authSeqRef.current && profile) setUser(profile)
+      } else if (event === 'SIGNED_OUT') {
+        if (intendedSignOut.current) {
+          // Intentional logout – clear user immediately
+          setUser(null)
+        } else {
+          // Spurious SIGNED_OUT (e.g. failed token refresh in CI).
+          // Re-check the actual session: if it's gone, clear user; otherwise keep it.
+          const { data: { session: currentSession } } = await supabase.auth.getSession()
+          if (!currentSession) setUser(null)
+          // else: session is still valid – keep the current user state as-is
+        }
       }
     })
 
@@ -51,7 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    intendedSignOut.current = true
     await supabase.auth.signOut()
+    // Fallback: ensure user is cleared even if the SIGNED_OUT event already did it.
+    setUser(null)
+    intendedSignOut.current = false
   }
 
   return (
