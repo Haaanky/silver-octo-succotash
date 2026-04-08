@@ -19,7 +19,7 @@ En webbaserad lagerhanteringsapp för att scanna streckkoder/QR-koder och hålla
 
 | Område | Val |
 |---|---|
-| Frontend | React 18 + TypeScript + Vite |
+| Frontend | React 19 + TypeScript + Vite |
 | Styling | Tailwind CSS |
 | Routing | React Router v6 (HashRouter) |
 | Auth & databas | Supabase (PostgreSQL + Row Level Security) |
