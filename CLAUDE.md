@@ -74,7 +74,9 @@ Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROX
 Supabase-credentials hanteras olika beroende på workflow-typ:
 
 **PR Preview (`pr-preview.yml`):**  
-Credentials är inbäddade direkt i workflow-filen som publika värden (Supabase anon-nyckeln är avsedd att vara publik och bäddas in i webbläsaren ändå). Workflowen kräver **inte** `environment: Supabase`, vilket innebär att bot-skapade PRs (t.ex. copilot-swe-agent) kan köra preview-deployen utan mänskligt godkännande.
+Credentials är inbäddade direkt i workflow-filen som publika värden (Supabase anon-nyckeln är avsedd att vara publik och bäddas in i webbläsaren ändå). Workflowen kräver **inte** `environment: Supabase`.
+
+> ⚠️ **Känt beteende:** PR Preview-workflowen visar ändå `action_required` (0 jobb körs) för PRs skapade av `copilot-swe-agent[bot]`. Detta beror på GitHub:s repository-inställning för workflow-godkännande (troligen "Require approval for all outside collaborators"). Repoägaren måste manuellt godkänna workflow-körningen via GitHub Actions-sidan för att preview-deployen ska köras.
 
 **Deploy och E2E (`deploy.yml`, `e2e.yml`, `e2e-pr.yml`):**  
 `VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY` hämtas via `environment: Supabase` (miljöhemligheter). Dessa workflows triggas av push till `main` eller av andra workflows, inte direkt av bot-PR:s.
