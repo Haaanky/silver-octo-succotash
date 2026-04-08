@@ -58,9 +58,25 @@ test.describe('Lagerlista', () => {
     await page.fill('input[type="search"]', '');
     await expect(page.locator('table tbody tr')).toHaveCount(totalRows);
   });
+
+  test('visar statistikkort med saldostatus', async ({ page }) => {
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+    // Stat cards are shown when products exist
+    await expect(page.getByText('Totalt produkter')).toBeVisible();
+    await expect(page.getByText('OK lager')).toBeVisible();
+    await expect(page.getByText('Lågt lager')).toBeVisible();
+    await expect(page.getByText('Tomt lager')).toBeVisible();
+  });
+
+  test('visar saldostatus-badge (OK/Lågt/Tomt) för produkter', async ({ page }) => {
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+    // Seed product has current_stock=10, min_stock=5 → status should be OK
+    const seedRow = page.locator('table tbody tr').filter({ hasText: 'Testprodukt Seed' });
+    await expect(seedRow).toBeVisible();
+    await expect(seedRow.locator('.badge-green')).toBeVisible();
+  });
 });
 
-// ─── Navigation ───────────────────────────────────────────────────────────────
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -166,7 +182,21 @@ test.describe('Produkthantering', () => {
     await expect(page.locator('h2')).toHaveCount(0, { timeout: 10_000 });
   });
 
-  test('visar skanningsknappar i produktformuläret', async ({ page }) => {
+  test('kan ta bort en produkt', async ({ page }) => {
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+
+    // Count rows before deletion
+    const rowsBefore = await page.locator('table tbody tr').count();
+
+    // Accept the browser confirm dialog
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('button:has-text("Ta bort")').first().click();
+
+    // Row count should decrease by 1
+    await expect(page.locator('table tbody tr')).toHaveCount(rowsBefore - 1, { timeout: 10_000 });
+  });
+
+
     await page.click('button:has-text("Ny produkt")');
     await expect(page.locator('h2')).toContainText('Ny produkt');
 
@@ -206,9 +236,14 @@ test.describe('Produkthantering', () => {
 
 test.describe('Skanna / Transaktioner', () => {
   test.beforeEach(async ({ page }) => {
+    await seedProducts(page);
     await loginAsAdmin(page);
     await page.getByRole('link', { name: 'Skanna' }).click();
     await expect(page.locator('h1')).toHaveText('Skanna');
+  });
+
+  test.afterAll(async () => {
+    await cleanupSeedProducts();
   });
 
   test('visar steg-indikator och manuellt inmatningsfält', async ({ page }) => {
@@ -220,6 +255,23 @@ test.describe('Skanna / Transaktioner', () => {
     await page.fill('input[placeholder="Streckkod eller SKU"]', 'OKANDSTRECKKOD999');
     await page.click('button:has-text("Sök")');
     await expect(page.locator('[role="alert"]')).toContainText('Okänd streckkod', { timeout: 15_000 });
+  });
+
+  test('registrerar inleverans för känd produkt (happy path)', async ({ page }) => {
+    // Use the seeded product barcode
+    await page.fill('input[placeholder="Streckkod eller SKU"]', '1234567890123');
+    await page.click('button:has-text("Sök")');
+
+    // Step 2: confirm panel should appear with product name
+    await expect(page.getByText('Produkt hittad')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Testprodukt Seed')).toBeVisible();
+
+    // Select inleverans and confirm
+    await page.selectOption('select', 'in');
+    await page.click('button:has-text("Registrera")');
+
+    // Step 3: done screen
+    await expect(page.getByText('Registrerad!')).toBeVisible({ timeout: 15_000 });
   });
 });
 
