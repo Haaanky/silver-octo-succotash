@@ -69,22 +69,24 @@ Claude Code körs i en container med en HTTPS-intercepterande proxy (`HTTPS_PROX
 
 **Om siten är vit men tester är gröna:** testerna kan ha timeout:at för tidigt. Fixa grundorsaken, öppna ny PR, iterera.
 
-### ⚠️ GitHub Actions – hemligheter är miljöbegränsade
+### ⚠️ GitHub Actions – Supabase-credentials i preview vs. deploy
 
-`VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY` är lagrade som **miljöhemligheter** under GitHub-miljön `Supabase` (inte som repository-hemligheter). Det innebär att **alla jobb som behöver dessa hemligheter måste deklarera `environment: Supabase`**, annars blir värdena tomma strängar och appen kraschar vid start.
+Supabase-credentials hanteras olika beroende på workflow-typ:
 
-**Regel:** Varje nytt GitHub Actions-jobb som bygger eller kör appen och behöver Supabase-credentials MÅSTE ha:
-```yaml
-jobs:
-  ditt-jobb:
-    environment: Supabase
-```
+**PR Preview (`pr-preview.yml`):**  
+Credentials är inbäddade direkt i workflow-filen som publika värden (Supabase anon-nyckeln är avsedd att vara publik och bäddas in i webbläsaren ändå). Workflowen kräver **inte** `environment: Supabase`, vilket innebär att bot-skapade PRs (t.ex. copilot-swe-agent) kan köra preview-deployen utan mänskligt godkännande.
+
+**Deploy och E2E (`deploy.yml`, `e2e.yml`, `e2e-pr.yml`):**  
+`VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY` hämtas via `environment: Supabase` (miljöhemligheter). Dessa workflows triggas av push till `main` eller av andra workflows, inte direkt av bot-PR:s.
+
+**Regel:** Jobb som behöver Supabase-service-role-nyckel eller andra känsliga credentials ska använda `environment: Supabase`. Preview-byggen behöver bara den publika anon-nyckeln.
 
 Befintliga jobb med `environment: Supabase`:
 - `deploy.yml` → `deploy`-jobbet
-- `pr-preview.yml` → `preview`-jobbet
+- `e2e.yml` → `test`-jobbet
+- `e2e-pr.yml` → `test`-jobbet
 
-**Symptom om `environment: Supabase` saknas:** Appen byggs utan Supabase-URL → blank sida i preview → ALLA E2E-tester timeout:ar (~30 min körtid). Verifiera felet genom att hämta JS-bundeln och söka efter Supabase-URL:en – om den saknas är det detta problem.
+**Symptom om credentials saknas i pr-preview:** Appen byggs med tomma Supabase-URL → blank sida → ALLA E2E-tester timeout:ar (~30 min körtid). Verifiera felet genom att hämta JS-bundeln och söka efter Supabase-URL:en – om den saknas är det detta problem.
 
 ### Vad testerna täcker
 
