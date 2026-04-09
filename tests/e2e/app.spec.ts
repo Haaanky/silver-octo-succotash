@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ test.describe('Lagerlista', () => {
     // Stat cards are shown when products exist
     await expect(page.getByText('Totalt produkter')).toBeVisible();
     await expect(page.getByText('OK lager')).toBeVisible();
-    await expect(page.getByText('Lågt lager')).toBeVisible();
+    await expect(page.getByText('Lågt lager', { exact: true })).toBeVisible();
     await expect(page.getByText('Tomt lager')).toBeVisible();
   });
 
@@ -349,5 +349,51 @@ test.describe('Sessionshantering', () => {
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 15_000 });
     await goto(page, '/#/products');
     await page.waitForURL(url => url.hash.includes('login') || url.pathname.includes('login'), { timeout: 15_000 });
+  });
+});
+
+// ─── Lagerarbetare-roll ───────────────────────────────────────────────────────
+
+test.describe('Lagerarbetare-roll', () => {
+  test.beforeAll(async () => {
+    await seedWorker();
+  });
+
+  test.afterAll(async () => {
+    await cleanupWorker();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginAsWorker(page);
+  });
+
+  test('worker ser rätt nav-länkar (Lagerlista, Skanna, Export)', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Lagerlista' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Skanna' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Export' })).toBeVisible();
+  });
+
+  test('worker ser inte admin-länkar (Produkter, Historik)', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Produkter' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Historik' })).toHaveCount(0);
+  });
+
+  test('worker omdirigeras från /products till lagerlistan', async ({ page }) => {
+    await goto(page, '/#/products');
+    await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 10_000 });
+  });
+
+  test('worker omdirigeras från /history till lagerlistan', async ({ page }) => {
+    await goto(page, '/#/history');
+    await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 10_000 });
+  });
+
+  test('worker kan navigera till Skanna', async ({ page }) => {
+    await page.getByRole('link', { name: 'Skanna' }).click();
+    await expect(page.locator('h1')).toHaveText('Skanna');
+  });
+
+  test('navbar visar worker-roll', async ({ page }) => {
+    await expect(page.getByText('worker', { exact: true })).toBeVisible();
   });
 });
