@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker, seedDeletableUser, cleanupDeletableUser, DELETABLE_USER_EMAIL } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -352,6 +352,76 @@ test.describe('Sessionshantering', () => {
   });
 });
 
+// ─── Användarhantering ────────────────────────────────────────────────────────
+
+test.describe('Användarhantering (admin)', () => {
+  test.beforeAll(async () => {
+    await seedDeletableUser();
+  });
+
+  test.afterAll(async () => {
+    await cleanupDeletableUser();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test('Användare-länk visas i nav för admin', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Användare' })).toBeVisible();
+  });
+
+  test('Admin kan navigera till /users', async ({ page }) => {
+    await page.getByRole('link', { name: 'Användare' }).click();
+    await expect(page.locator('h1')).toHaveText('Användare');
+  });
+
+  test('Sidan visar lista med befintliga användare', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table')).toContainText(ADMIN.email);
+  });
+
+  test('Admin kan bjuda in ny användare', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    const inviteEmail = `test-invite-${Date.now()}@playwright-test.local`;
+    await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
+    await page.click('button:has-text("Bjud in")');
+    await expect(page.locator('[role="status"]').or(page.getByText('Inbjudan skickad')).or(page.getByText(inviteEmail))).toBeVisible({ timeout: 15_000 });
+    // Cleanup: invited user appears in list; service role cleanup handles it via afterAll pattern
+  });
+
+  test('Felmeddelande visas om e-post är ogiltig', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await page.fill('input[type="email"][placeholder*="E-post"]', 'inte-en-epost');
+    await page.click('button:has-text("Bjud in")');
+    // HTML5 validation or custom error message
+    const isInvalid = await page.locator('input[type="email"][placeholder*="E-post"]').evaluate(
+      (el: HTMLInputElement) => !el.validity.valid
+    );
+    const errorMsg = page.locator('[role="alert"]');
+    expect(isInvalid || await errorMsg.isVisible()).toBeTruthy();
+  });
+
+  test('Admin kan ta bort en användare', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15_000 });
+    // Wait for the deletable user to appear in the list
+    await expect(page.locator('table').getByText(DELETABLE_USER_EMAIL)).toBeVisible({ timeout: 15_000 });
+    // Click the delete button for that user
+    const row = page.locator('tr').filter({ hasText: DELETABLE_USER_EMAIL });
+    await row.getByRole('button', { name: /Ta bort/ }).click();
+    // Confirm deletion in the inline confirmation
+    await row.getByRole('button', { name: /Bekräfta/ }).click();
+    // User should no longer appear in the table
+    await expect(page.locator('table').getByText(DELETABLE_USER_EMAIL)).toHaveCount(0, { timeout: 15_000 });
+  });
+});
+
 // ─── Lagerarbetare-roll ───────────────────────────────────────────────────────
 
 test.describe('Lagerarbetare-roll', () => {
@@ -395,5 +465,14 @@ test.describe('Lagerarbetare-roll', () => {
 
   test('navbar visar worker-roll', async ({ page }) => {
     await expect(page.getByText('worker', { exact: true })).toBeVisible();
+  });
+
+  test('worker ser inte Användare-länk i nav', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Användare' })).toHaveCount(0);
+  });
+
+  test('worker omdirigeras från /users till lagerlistan', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 10_000 });
   });
 });

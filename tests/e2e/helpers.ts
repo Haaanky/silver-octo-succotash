@@ -142,3 +142,37 @@ export async function loginAsWorker(page: Page) {
   await page.waitForURL(url => !url.hash.includes('login') && !url.pathname.includes('login'), { timeout: 30_000 });
   await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 30_000 });
 }
+
+// E-post för testanvändare som ska kunna tas bort via UI
+export const DELETABLE_USER_EMAIL = 'test-delete-playwright@playwright-test.local';
+
+/**
+ * Skapar en testanvändare som kan tas bort i UI-testet för användarhantering.
+ * Kräver SUPABASE_SERVICE_ROLE_KEY.
+ */
+export async function seedDeletableUser() {
+  if (!SERVICE_ROLE_KEY) return;
+  const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { error } = await serviceClient.auth.admin.createUser({
+    email: DELETABLE_USER_EMAIL,
+    password: 'deletable123',
+    email_confirm: true,
+  });
+  if (error && !/already registered|user already exists/i.test(error.message)) {
+    throw new Error(`seedDeletableUser failed: ${error.message}`);
+  }
+}
+
+/**
+ * Tar bort testanvändaren som skapades för borttagningstest.
+ * Kräver SUPABASE_SERVICE_ROLE_KEY.
+ */
+export async function cleanupDeletableUser() {
+  if (!SERVICE_ROLE_KEY) return;
+  const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { data } = await serviceClient.auth.admin.listUsers();
+  const user = data?.users?.find(u => u.email === DELETABLE_USER_EMAIL);
+  if (user) {
+    await serviceClient.auth.admin.deleteUser(user.id);
+  }
+}
