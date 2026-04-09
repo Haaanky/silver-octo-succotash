@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 export const ADMIN = { email: 'admin@lager.se', password: 'admin123' };
+export const WORKER = { email: 'worker@lager.se', password: 'worker123' };
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ihqqqynuqclycffgraxl.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -82,6 +83,61 @@ export async function loginAsAdmin(page: Page) {
   await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
   await page.fill('input[type="email"]', ADMIN.email);
   await page.fill('input[type="password"]', ADMIN.password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL(url => !url.hash.includes('login') && !url.pathname.includes('login'), { timeout: 30_000 });
+  await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 30_000 });
+}
+
+/**
+ * Ensures the worker user exists. Uses service role if available, otherwise
+ * falls back to signUp (assumes email confirmation is disabled).
+ * Treats "user already registered" as success.
+ */
+export async function seedWorker() {
+  if (SERVICE_ROLE_KEY) {
+    const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { error } = await serviceClient.auth.admin.createUser({
+      email: WORKER.email,
+      password: WORKER.password,
+      email_confirm: true,
+    });
+    // Ignore "already registered / already exists" errors
+    if (error && !/already registered|user already exists/i.test(error.message)) {
+      throw new Error(`seedWorker (admin) failed: ${error.message}`);
+    }
+    return;
+  }
+  if (!ANON_KEY) return;
+  // Fallback: signUp (email confirmation must be disabled in the Supabase project)
+  const client = createClient(SUPABASE_URL, ANON_KEY);
+  const { error } = await client.auth.signUp({
+    email: WORKER.email,
+    password: WORKER.password,
+  });
+  // Ignore "User already registered" — user exists and can log in
+  if (error && !/already registered|user already exists/i.test(error.message)) {
+    throw new Error(`seedWorker (signUp) failed: ${error.message}`);
+  }
+}
+
+/**
+ * Removes the worker test user. Only possible with service role key.
+ */
+export async function cleanupWorker() {
+  if (!SERVICE_ROLE_KEY) return;
+  const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { data } = await serviceClient.auth.admin.listUsers();
+  const worker = data?.users?.find(u => u.email === WORKER.email);
+  if (worker) {
+    await serviceClient.auth.admin.deleteUser(worker.id);
+  }
+}
+
+export async function loginAsWorker(page: Page) {
+  await goto(page, '/#/login');
+  await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
+  await page.fill('input[type="email"]', WORKER.email);
+  await page.fill('input[type="password"]', WORKER.password);
   await page.click('button[type="submit"]');
   await page.waitForURL(url => !url.hash.includes('login') && !url.pathname.includes('login'), { timeout: 30_000 });
   await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 30_000 });
