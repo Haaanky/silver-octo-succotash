@@ -196,7 +196,7 @@ test.describe('Produkthantering', () => {
     await expect(page.locator('table tbody tr')).toHaveCount(rowsBefore - 1, { timeout: 10_000 });
   });
 
-
+  test('visar skannerknapp i produktformulär', async ({ page }) => {
     await page.click('button:has-text("Ny produkt")');
     await expect(page.locator('h2')).toContainText('Ny produkt');
 
