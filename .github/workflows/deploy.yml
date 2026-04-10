@@ -46,3 +46,13 @@ jobs:
           folder: web/dist
           clean-exclude: pr-preview
           single-commit: true
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        run: supabase functions deploy invite-user --project-ref ihqqqynuqclycffgraxl
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
