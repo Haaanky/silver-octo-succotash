@@ -428,14 +428,14 @@ test.describe('Användarhantering (admin)', () => {
     invitedUserEmail = inviteEmail;
     await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
 
+    // Edge Function returns { success: true, userId: string }
     const inviteResponsePromise = page.waitForResponse(async (response) => {
       if (response.request().method() !== 'POST' || !response.ok() || !response.url().includes('/invite')) {
         return false;
       }
-
       try {
         const payload = await response.clone().json();
-        return Boolean(payload?.user?.email === inviteEmail || payload?.email === inviteEmail);
+        return payload?.success === true && typeof payload?.userId === 'string';
       } catch {
         return false;
       }
@@ -445,7 +445,7 @@ test.describe('Användarhantering (admin)', () => {
 
     const inviteResponse = await inviteResponsePromise;
     const invitePayload = await inviteResponse.json();
-    invitedUserId = invitePayload?.user?.id ?? invitePayload?.id ?? null;
+    invitedUserId = invitePayload?.userId ?? null;
 
     expect(invitedUserId).toBeTruthy();
     await expect(page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' })).toBeVisible({ timeout: 15_000 });

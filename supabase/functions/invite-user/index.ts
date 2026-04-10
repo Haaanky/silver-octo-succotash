@@ -98,6 +98,25 @@ Deno.serve(async (req) => {
     })
   }
 
+  // ── list ──────────────────────────────────────────────────────────────────
+  if (body.action === 'list') {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, role')
+      .order('email')
+    if (error) {
+      console.error('List users error:', error.message)
+      return new Response(JSON.stringify({ error: 'Kunde inte hämta användare' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    return new Response(JSON.stringify({ users: data ?? [] }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  // ── invite ────────────────────────────────────────────────────────────────
   if (body.action === 'invite') {
     if (!body.email) {
       return new Response(JSON.stringify({ error: 'E-post saknas' }), {
@@ -134,7 +153,11 @@ Deno.serve(async (req) => {
     }
     const { error } = await supabaseAdmin.auth.admin.deleteUser(body.userId)
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error('Delete user failed:', error.message)
+      const msg = /not found/i.test(error.message)
+        ? 'Användaren hittades inte'
+        : 'Kunde inte ta bort användaren'
+      return new Response(JSON.stringify({ error: msg }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

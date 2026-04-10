@@ -45,6 +45,7 @@ export default function Users() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteStatus, setInviteStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -58,7 +59,9 @@ export default function Users() {
     }
     listUsers()
       .then(setUsers)
-      .catch(err => console.error('Kunde inte hämta användare:', err))
+      .catch(err => {
+        setLoadError(err instanceof Error ? err.message : 'Kunde inte hämta användare')
+      })
       .finally(() => setLoading(false))
   }, [user, navigate])
 
@@ -108,6 +111,12 @@ export default function Users() {
         <h1 className="text-2xl font-bold text-slate-900">Användare</h1>
         <p className="text-sm text-slate-500 mt-1">{users.length} användare totalt</p>
       </div>
+
+      {loadError && (
+        <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+          {loadError}
+        </div>
+      )}
 
       {/* Bjud in ny användare */}
       <div className="card p-6">
