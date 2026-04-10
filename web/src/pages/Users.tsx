@@ -3,6 +3,43 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { listUsers, inviteUser, deleteUser, type UserProfile } from '../services/users'
 
+function getInviteErrorMessage(err: unknown) {
+  const technicalMessage = err instanceof Error ? err.message : ''
+  const normalizedMessage = technicalMessage.toLowerCase()
+
+  if (normalizedMessage.includes('invalid email') || normalizedMessage.includes('email address is invalid')) {
+    return 'Ange en giltig e-postadress.'
+  }
+
+  if (
+    normalizedMessage.includes('already invited') ||
+    normalizedMessage.includes('already exists') ||
+    normalizedMessage.includes('user already registered') ||
+    normalizedMessage.includes('already been registered')
+  ) {
+    return 'Den här e-postadressen har redan bjudits in eller används redan.'
+  }
+
+  if (
+    normalizedMessage.includes('not authorized') ||
+    normalizedMessage.includes('unauthorized') ||
+    normalizedMessage.includes('forbidden') ||
+    normalizedMessage.includes('permission')
+  ) {
+    return 'Du har inte behörighet att bjuda in användare.'
+  }
+
+  if (
+    normalizedMessage.includes('functionshttperror') ||
+    normalizedMessage.includes('edge function') ||
+    normalizedMessage.includes('failed to send a request')
+  ) {
+    return 'Det gick inte att skicka inbjudan just nu. Försök igen om en stund.'
+  }
+
+  return 'Det gick inte att skicka inbjudan just nu. Försök igen om en stund.'
+}
+
 export default function Users() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -37,8 +74,8 @@ export default function Users() {
       const updated = await listUsers()
       setUsers(updated)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Okänt fel'
-      setInviteStatus({ type: 'error', message: msg })
+      console.error('Kunde inte skicka inbjudan:', err)
+      setInviteStatus({ type: 'error', message: getInviteErrorMessage(err) })
     } finally {
       setInviting(false)
     }

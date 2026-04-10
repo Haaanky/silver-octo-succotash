@@ -6,9 +6,39 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+function getSafeInviteErrorMessage(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? ''
+
+  if (
+    message.includes('already been invited') ||
+    message.includes('user already registered') ||
+    message.includes('already registered') ||
+    message.includes('already exists')
+  ) {
+    return 'Användaren är redan inbjuden eller registrerad'
+  }
+
+  if (message.includes('invalid email')) {
+    return 'Ogiltig e-postadress'
+  }
+
+  return 'Kunde inte skicka inbjudan just nu'
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    return new Response(JSON.stringify({ error: 'Serverkonfiguration saknas: SUPABASE_URL, SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
   const authHeader = req.headers.get('Authorization')
@@ -21,8 +51,8 @@ Deno.serve(async (req) => {
 
   // Verifiera att anroparen är inloggad
   const supabaseUser = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    supabaseUrl,
+    supabaseAnonKey,
     { global: { headers: { Authorization: authHeader } } },
   )
   const { data: { user } } = await supabaseUser.auth.getUser()
@@ -35,14 +65,21 @@ Deno.serve(async (req) => {
 
   // Verifiera att anroparen är admin
   const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    supabaseUrl,
+    supabaseServiceRoleKey,
   )
-  const { data: profile } = await supabaseAdmin
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
+
+  if (profileError) {
+    return new Response(JSON.stringify({ error: 'Kunde inte verifiera admin-behörighet' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
   if (profile?.role !== 'admin') {
     return new Response(JSON.stringify({ error: 'Åtkomst nekad – endast admin' }), {
@@ -70,7 +107,8 @@ Deno.serve(async (req) => {
     }
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(body.email)
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error('Invite user failed:', error)
+      return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(error) }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

@@ -148,15 +148,30 @@ export const DELETABLE_USER_EMAIL = 'test-delete-playwright@playwright-test.loca
 
 /**
  * Skapar en testanvändare som kan tas bort i UI-testet för användarhantering.
- * Kräver SUPABASE_SERVICE_ROLE_KEY.
+ * Använder service role när den finns, annars fallback via vanlig signUp.
  */
 export async function seedDeletableUser() {
-  if (!SERVICE_ROLE_KEY) return;
-  const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  const { error } = await serviceClient.auth.admin.createUser({
+  if (SERVICE_ROLE_KEY) {
+    const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { error } = await serviceClient.auth.admin.createUser({
+      email: DELETABLE_USER_EMAIL,
+      password: 'deletable123',
+      email_confirm: true,
+    });
+    if (error && !/already registered|user already exists/i.test(error.message)) {
+      throw new Error(`seedDeletableUser failed: ${error.message}`);
+    }
+    return;
+  }
+
+  if (!ANON_KEY) {
+    throw new Error('seedDeletableUser failed: missing SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY');
+  }
+
+  const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+  const { error } = await anonClient.auth.signUp({
     email: DELETABLE_USER_EMAIL,
     password: 'deletable123',
-    email_confirm: true,
   });
   if (error && !/already registered|user already exists/i.test(error.message)) {
     throw new Error(`seedDeletableUser failed: ${error.message}`);

@@ -367,6 +367,44 @@ test.describe('Användarhantering (admin)', () => {
     await loginAsAdmin(page);
   });
 
+  let invitedUserId: string | null = null;
+  let invitedUserEmail: string | null = null;
+
+  test.afterEach(async () => {
+    if (!invitedUserId) {
+      invitedUserEmail = null;
+      return;
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error(
+        `Cleanup saknar SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY för inbjuden testanvändare${invitedUserEmail ? ` (${invitedUserEmail})` : ''}.`
+      );
+    }
+
+    const deleteResponse = await fetch(
+      `${supabaseUrl.replace(/\/$/, '')}/auth/v1/admin/users/${invitedUserId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }
+    );
+
+    invitedUserId = null;
+    invitedUserEmail = null;
+
+    if (!deleteResponse.ok && deleteResponse.status !== 404) {
+      const body = await deleteResponse.text();
+      throw new Error(`Kunde inte radera inbjuden testanvändare: ${deleteResponse.status} ${body}`);
+    }
+  });
+
   test('Användare-länk visas i nav för admin', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'Användare' })).toBeVisible();
   });
@@ -387,10 +425,33 @@ test.describe('Användarhantering (admin)', () => {
     await goto(page, '/#/users');
     await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
     const inviteEmail = `test-invite-${Date.now()}@playwright-test.local`;
+    invitedUserEmail = inviteEmail;
     await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
+
+    const inviteResponsePromise = page.waitForResponse(async (response) => {
+      if (response.request().method() !== 'POST' || !response.ok() || !response.url().includes('/invite')) {
+        return false;
+      }
+
+      try {
+        const payload = await response.clone().json();
+        return Boolean(payload?.user?.email === inviteEmail || payload?.email === inviteEmail);
+      } catch {
+        return false;
+      }
+    });
+
     await page.click('button:has-text("Bjud in")');
-    await expect(page.locator('[role="status"]').or(page.getByText('Inbjudan skickad')).or(page.getByText(inviteEmail))).toBeVisible({ timeout: 15_000 });
-    // Cleanup: invited user appears in list; service role cleanup handles it via afterAll pattern
+
+    const inviteResponse = await inviteResponsePromise;
+    const invitePayload = await inviteResponse.json();
+    invitedUserId = invitePayload?.user?.id ?? invitePayload?.id ?? null;
+
+    expect(invitedUserId).toBeTruthy();
+    await expect(page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' })).toBeVisible({ timeout: 15_000 });
+    await page.reload();
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await expect(page.locator('table')).toContainText(inviteEmail, { timeout: 15_000 });
   });
 
   test('Felmeddelande visas om e-post är ogiltig', async ({ page }) => {
