@@ -132,7 +132,21 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    return new Response(JSON.stringify({ success: true, userId: data.user?.id }), {
+    // data.user?.id can be undefined in some GoTrue configurations even on success.
+    // Fall back to querying the profiles table (created synchronously via trigger).
+    let userId: string | null = data.user?.id ?? null
+    if (!userId) {
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', body.email)
+        .maybeSingle()
+      if (profileError) {
+        console.error('Profile lookup fallback failed:', profileError.message)
+      }
+      userId = profile?.id ?? null
+    }
+    return new Response(JSON.stringify({ success: true, userId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

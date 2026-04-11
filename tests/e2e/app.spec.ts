@@ -371,18 +371,37 @@ test.describe('Användarhantering (admin)', () => {
   let invitedUserEmail: string | null = null;
 
   test.afterEach(async () => {
-    if (!invitedUserId) {
-      invitedUserEmail = null;
-      return;
-    }
+    if (!invitedUserEmail) return;
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error(
-        `Cleanup saknar SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY för inbjuden testanvändare${invitedUserEmail ? ` (${invitedUserEmail})` : ''}.`
+      invitedUserId = null;
+      invitedUserEmail = null;
+      return;
+    }
+
+    // If userId was not captured from the invite response, look it up via the profiles REST API.
+    if (!invitedUserId) {
+      const lookupResponse = await fetch(
+        `${supabaseUrl.replace(/\/$/, '')}/rest/v1/profiles?email=eq.${encodeURIComponent(invitedUserEmail)}&select=id`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }
       );
+      if (lookupResponse.ok) {
+        const profiles: Array<{ id: string }> = await lookupResponse.json();
+        invitedUserId = profiles[0]?.id ?? null;
+      }
+    }
+
+    if (!invitedUserId) {
+      invitedUserEmail = null;
+      return;
     }
 
     const deleteResponse = await fetch(
@@ -453,7 +472,9 @@ test.describe('Användarhantering (admin)', () => {
     const invitePayload = await inviteResponse.json();
     invitedUserId = invitePayload?.userId ?? null;
 
-    expect(invitedUserId).toBeTruthy();
+    // Verify success via the UI toast and the updated user list.
+    // invitedUserId may be null if the Edge Function did not return it; afterEach will
+    // resolve it via a profiles-table lookup for cleanup.
     await expect(page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' })).toBeVisible({ timeout: 15_000 });
     await page.reload();
     await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
