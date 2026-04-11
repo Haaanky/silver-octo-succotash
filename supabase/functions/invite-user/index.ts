@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.100.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -142,13 +142,23 @@ Deno.serve(async (req) => {
         email: body.email,
       })
       if (linkError) {
-        console.error('generateLink fallback also failed:', linkError.message)
-        return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(error) }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        // generateLink also failed – last resort: createUser (creates account without invite email)
+        console.warn('generateLink fallback also failed, trying createUser:', linkError.message)
+        const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email: body.email,
+          email_confirm: false,
         })
+        if (createError) {
+          console.error('All invite methods failed:', createError.message)
+          return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(linkError) }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        userId = createData.user?.id ?? null
+      } else {
+        userId = linkData.user?.id ?? null
       }
-      userId = linkData.user?.id ?? null
     }
 
     // If userId is still missing, look it up in the profiles table.

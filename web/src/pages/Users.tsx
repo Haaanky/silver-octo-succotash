@@ -60,7 +60,8 @@ export default function Users() {
     listUsers()
       .then(setUsers)
       .catch(err => {
-        setLoadError(err instanceof Error ? err.message : 'Kunde inte hämta användare')
+        console.error('Kunde inte hämta användare:', err)
+        setLoadError('Kunde inte hämta användarlistan. Försök ladda om sidan.')
       })
       .finally(() => setLoading(false))
   }, [user, navigate])
@@ -69,18 +70,24 @@ export default function Users() {
     e.preventDefault()
     setInviteStatus(null)
     setInviting(true)
+    let succeeded = false
+    const emailToInvite = inviteEmail
     try {
-      await inviteUser(inviteEmail)
-      setInviteStatus({ type: 'success', message: `Inbjudan skickad till ${inviteEmail}` })
+      await inviteUser(emailToInvite)
+      succeeded = true
+      setInviteStatus({ type: 'success', message: `Inbjudan skickad till ${emailToInvite}` })
       setInviteEmail('')
-      // Reload list so newly invited user (with pending profile) shows up
-      const updated = await listUsers()
-      setUsers(updated)
     } catch (err) {
       console.error('Kunde inte skicka inbjudan:', err)
       setInviteStatus({ type: 'error', message: getInviteErrorMessage(err) })
     } finally {
       setInviting(false)
+    }
+    // Reload list outside the try-catch so a refresh failure never overwrites the success message
+    if (succeeded) {
+      listUsers().then(setUsers).catch(err => {
+        console.error('Kunde inte uppdatera användarlistan:', err)
+      })
     }
   }
 
@@ -92,7 +99,18 @@ export default function Users() {
       setConfirmDeleteId(null)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Okänt fel'
-      setDeleteError(msg)
+      const normalizedMsg = msg.toLowerCase()
+      let friendlyMsg: string
+      if (normalizedMsg.includes('eget konto') || normalizedMsg.includes('own account')) {
+        friendlyMsg = 'Du kan inte ta bort ditt eget konto.'
+      } else if (normalizedMsg.includes('åtkomst nekad') || normalizedMsg.includes('forbidden') || normalizedMsg.includes('unauthorized')) {
+        friendlyMsg = 'Åtkomst nekad – du har inte behörighet att ta bort användare.'
+      } else if (normalizedMsg.includes('hittades inte') || normalizedMsg.includes('not found')) {
+        friendlyMsg = 'Användaren hittades inte.'
+      } else {
+        friendlyMsg = 'Kunde inte ta bort användaren. Försök igen.'
+      }
+      setDeleteError(friendlyMsg)
       setConfirmDeleteId(null)
     }
   }
