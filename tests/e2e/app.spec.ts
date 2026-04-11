@@ -389,7 +389,7 @@ test.describe('Användarhantering (admin)', () => {
     // If userId was not captured from the invite response, look it up via the profiles REST API.
     if (!invitedUserId) {
       const lookupResponse = await fetch(
-        `${supabaseUrl.replace(/\/$/, '')}/rest/v1/profiles?email=eq.${encodeURIComponent(invitedUserEmail)}&select=id`,
+        `${supabaseUrl.replace(/\/$/, '')}/rest/v1/profiles?email=eq.${encodeURIComponent(invitedUserEmail)}&select=id&order=id.asc&limit=1`,
         {
           headers: {
             apikey: serviceRoleKey,
