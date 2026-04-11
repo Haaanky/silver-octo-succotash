@@ -400,6 +400,11 @@ test.describe('Användarhantering (admin)', () => {
       if (lookupResponse.ok) {
         const profiles: Array<{ id: string }> = await lookupResponse.json();
         invitedUserId = profiles[0]?.id ?? null;
+      } else if (process.env.CI) {
+        const lookupResponseBody = await lookupResponse.text();
+        console.warn(
+          `⚠ Cleanup profile lookup failed for ${invitedUserEmail}: ${lookupResponse.status} ${lookupResponse.statusText}${lookupResponseBody ? ` – ${lookupResponseBody}` : ''}`
+        );
       }
     }
 
