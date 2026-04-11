@@ -146,7 +146,8 @@ Deno.serve(async (req) => {
       }
       userId = profile?.id ?? null
     }
-    return new Response(JSON.stringify({ success: true, userId }), {
+    const responseBody = userId ? { success: true, userId } : { success: true }
+    return new Response(JSON.stringify(responseBody), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
