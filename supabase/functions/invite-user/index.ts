@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         })
         if (createError) {
           console.error('All invite methods failed:', createError.message)
-          return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(linkError) }), {
+          return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(createError) }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
