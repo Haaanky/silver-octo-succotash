@@ -124,28 +124,47 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    let userId: string | null = null
+
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(body.email)
-    if (error) {
-      console.error('Invite user failed:', error)
-      return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(error) }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (!error) {
+      // inviteUserByEmail succeeded (invite email sent).
+      // data.user?.id can be undefined in some GoTrue configurations even on success;
+      // fall back to a profiles-table lookup in that case.
+      userId = data.user?.id ?? null
+    } else {
+      // inviteUserByEmail failed (e.g. email-service rate limit, SMTP misconfiguration).
+      // Fall back to generateLink which creates the user without sending the email.
+      console.warn('inviteUserByEmail failed, falling back to generateLink:', error.message)
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'invite',
+        email: body.email,
       })
+      if (linkError) {
+        console.error('generateLink fallback also failed:', linkError.message)
+        return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(error) }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      userId = linkData.user?.id ?? null
     }
-    // data.user?.id can be undefined in some GoTrue configurations even on success.
-    // Fall back to querying the profiles table (created synchronously via trigger).
-    let userId: string | null = data.user?.id ?? null
+
+    // If userId is still missing, look it up in the profiles table.
+    // The AFTER INSERT trigger on auth.users creates the profile row synchronously.
     if (!userId) {
-      const { data: profile, error: profileError } = await supabaseAdmin
+      const { data: profiles, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('email', body.email)
-        .maybeSingle()
+        .limit(1)
       if (profileError) {
         console.error('Profile lookup fallback failed:', profileError.message)
       }
-      userId = profile?.id ?? null
+      userId = profiles?.[0]?.id ?? null
     }
+
     const responseBody = userId ? { success: true, userId } : { success: true }
     return new Response(JSON.stringify(responseBody), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -373,10 +373,14 @@ test.describe('Användarhantering (admin)', () => {
   test.afterEach(async () => {
     if (!invitedUserEmail) return;
 
-    const supabaseUrl = process.env.SUPABASE_URL;
+    // Use the same URL source as helpers.ts so cleanup targets the same project.
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://ihqqqynuqclycffgraxl.supabase.co';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!serviceRoleKey) {
+      if (process.env.CI) {
+        console.warn(`⚠ Cleanup skipped for ${invitedUserEmail}: SUPABASE_SERVICE_ROLE_KEY not set in CI – stale test user may remain`);
+      }
       invitedUserId = null;
       invitedUserEmail = null;
       return;
@@ -443,7 +447,7 @@ test.describe('Användarhantering (admin)', () => {
   test('Admin kan bjuda in ny användare', async ({ page }) => {
     await goto(page, '/#/users');
     await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
-    const inviteEmail = `test-invite-${Date.now()}@playwright-test.local`;
+    const inviteEmail = `test-invite-${Date.now()}@example.com`;
     invitedUserEmail = inviteEmail;
     await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
 
