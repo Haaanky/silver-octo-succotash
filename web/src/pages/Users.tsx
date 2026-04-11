@@ -76,7 +76,7 @@ export default function Users() {
       const result = await inviteUser(emailToInvite)
       succeeded = true
       let successMessage: string
-      if (result.emailSent !== false) {
+      if (result.emailSent === true) {
         successMessage = `Inbjudan skickad till ${emailToInvite}`
       } else if (result.inviteLink) {
         successMessage = `Konto skapat för ${emailToInvite}. Dela länken manuellt: ${result.inviteLink}`
