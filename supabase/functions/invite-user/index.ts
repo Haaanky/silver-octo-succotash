@@ -158,6 +158,7 @@ Deno.serve(async (req) => {
         .from('profiles')
         .select('id')
         .eq('email', body.email)
+        .order('id', { ascending: true })
         .limit(1)
       if (profileError) {
         console.error('Profile lookup fallback failed:', profileError.message)
