@@ -429,17 +429,23 @@ test.describe('Användarhantering (admin)', () => {
     await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
 
     // Edge Function returns { success: true, userId: string }
-    const inviteResponsePromise = page.waitForResponse(async (response) => {
-      if (response.request().method() !== 'POST' || !response.ok() || !response.url().includes('/invite')) {
-        return false;
-      }
-      try {
-        const payload = await response.clone().json();
-        return payload?.success === true && typeof payload?.userId === 'string';
-      } catch {
-        return false;
-      }
-    });
+    // Use a synchronous predicate that inspects the *request* body to distinguish the
+    // "invite" action from the "list" action (both POST to the same endpoint). Reading
+    // the response body inside the predicate (async clone().json()) is unreliable and
+    // can cause the listener to never match.
+    const inviteResponsePromise = page.waitForResponse(
+      (response) => {
+        if (response.request().method() !== 'POST' || !response.url().includes('/invite-user')) {
+          return false;
+        }
+        try {
+          return response.request().postDataJSON()?.action === 'invite';
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 30_000 },
+    );
 
     await page.click('button:has-text("Bjud in")');
 
