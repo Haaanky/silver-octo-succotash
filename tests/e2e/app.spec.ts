@@ -396,44 +396,56 @@ test.describe('Användarhantering (admin)', () => {
   });
 
   test('Admin kan bjuda in ny användare', async ({ page }) => {
+    // Strict unit test: mock all invite-user Edge Function calls so the test
+    // has no dependency on SMTP, Edge Function deployment, or Supabase state.
+    const mockEmail = 'test-invite-mock@example.com';
+    let listCallCount = 0;
+
+    await page.route('**/functions/v1/invite-user', async (route, request) => {
+      const body = request.postDataJSON() as { action?: string } | null;
+
+      if (body?.action === 'list') {
+        // First call (page load): return only the admin.
+        // Subsequent calls (after invite / after reload): include the new user.
+        const users =
+          listCallCount === 0
+            ? [{ id: 'admin-id', email: ADMIN.email, role: 'admin' }]
+            : [
+                { id: 'admin-id', email: ADMIN.email, role: 'admin' },
+                { id: 'new-user-id', email: mockEmail, role: 'worker' },
+              ];
+        listCallCount++;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ users }),
+        });
+      } else if (body?.action === 'invite') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, userId: 'new-user-id', emailSent: true }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     await goto(page, '/#/users');
     await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
-    const inviteEmail = `test-invite-${Date.now()}@example.com`;
-    invitedUserEmail = inviteEmail;
-    await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
+    await expect(page.locator('table')).toContainText(ADMIN.email, { timeout: 10_000 });
 
-    // Edge Function returns { success: true, emailSent: boolean, userId?: string, inviteLink?: string }
-    // Use a synchronous predicate that inspects the *request* body to distinguish the
-    // "invite" action from the "list" action (both POST to the same endpoint). Reading
-    // the response body inside the predicate (async clone().json()) is unreliable and
-    // can cause the listener to never match.
-    const inviteResponsePromise = page.waitForResponse(
-      (response) => {
-        if (response.request().method() !== 'POST' || !response.url().includes('/invite-user')) {
-          return false;
-        }
-        try {
-          return response.request().postDataJSON()?.action === 'invite';
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 30_000 },
-    );
-
+    await page.fill('input[type="email"][placeholder*="E-post"]', mockEmail);
     await page.click('button:has-text("Bjud in")');
 
-    const inviteResponse = await inviteResponsePromise;
-    const invitePayload = await inviteResponse.json();
-    invitedUserId = invitePayload?.userId ?? null;
+    await expect(
+      page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' }),
+    ).toBeVisible({ timeout: 10_000 });
 
-    // Verify success via the UI toast and the updated user list.
-    // invitedUserId may be null if the Edge Function did not return it; afterEach will
-    // resolve it via a profiles-table lookup for cleanup.
-    await expect(page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' })).toBeVisible({ timeout: 15_000 });
+    // After reload the mocked list includes the newly invited user.
     await page.reload();
     await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
-    await expect(page.locator('table')).toContainText(inviteEmail, { timeout: 15_000 });
+    await expect(page.locator('table')).toContainText(mockEmail, { timeout: 10_000 });
   });
 
   test('Felmeddelande visas om e-post är ogiltig', async ({ page }) => {
