@@ -73,9 +73,17 @@ export default function Users() {
     let succeeded = false
     const emailToInvite = inviteEmail
     try {
-      await inviteUser(emailToInvite)
+      const result = await inviteUser(emailToInvite)
       succeeded = true
-      setInviteStatus({ type: 'success', message: `Inbjudan skickad till ${emailToInvite}` })
+      let successMessage: string
+      if (result.emailSent === true) {
+        successMessage = `Inbjudan skickad till ${emailToInvite}`
+      } else if (result.inviteLink) {
+        successMessage = `Konto skapat för ${emailToInvite}. Dela länken manuellt: ${result.inviteLink}`
+      } else {
+        successMessage = `Konto skapat för ${emailToInvite} (inget välkomstmail skickades)`
+      }
+      setInviteStatus({ type: 'success', message: successMessage })
       setInviteEmail('')
     } catch (err) {
       console.error('Kunde inte skicka inbjudan:', err)

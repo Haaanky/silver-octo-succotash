@@ -126,6 +126,8 @@ Deno.serve(async (req) => {
     }
 
     let userId: string | null = null
+    let emailSent = false
+    let inviteLink: string | undefined
 
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(body.email)
     if (!error) {
@@ -133,16 +135,17 @@ Deno.serve(async (req) => {
       // data.user?.id can be undefined in some GoTrue configurations even on success;
       // fall back to a profiles-table lookup in that case.
       userId = data.user?.id ?? null
+      emailSent = true
     } else {
       // inviteUserByEmail failed (e.g. email-service rate limit, SMTP misconfiguration).
-      // Fall back to generateLink which creates the user without sending the email.
+      // Fall back to generateLink which creates the user and returns an invite link.
       console.warn('inviteUserByEmail failed, falling back to generateLink:', error.message)
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'invite',
         email: body.email,
       })
       if (linkError) {
-        // generateLink also failed – last resort: createUser (creates account without invite email)
+        // generateLink also failed – last resort: createUser (creates account without invite link)
         console.warn('generateLink fallback also failed, trying createUser:', linkError.message)
         const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
           email: body.email,
@@ -150,14 +153,17 @@ Deno.serve(async (req) => {
         })
         if (createError) {
           console.error('All invite methods failed:', createError.message)
-          return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(linkError) }), {
+          return new Response(JSON.stringify({ error: getSafeInviteErrorMessage(createError) }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
         userId = createData.user?.id ?? null
+        // emailSent = false, inviteLink = undefined (account created but no invite link)
       } else {
         userId = linkData.user?.id ?? null
+        inviteLink = linkData.properties?.action_link
+        // emailSent = false (generateLink does not send an email; link must be shared manually)
       }
     }
 
@@ -176,7 +182,9 @@ Deno.serve(async (req) => {
       userId = profiles?.[0]?.id ?? null
     }
 
-    const responseBody = userId ? { success: true, userId } : { success: true }
+    const responseBody: Record<string, unknown> = { success: true, emailSent }
+    if (userId) responseBody.userId = userId
+    if (inviteLink) responseBody.inviteLink = inviteLink
     return new Response(JSON.stringify(responseBody), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

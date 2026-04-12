@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker, seedDeletableUser, cleanupDeletableUser, DELETABLE_USER_EMAIL } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker, seedDeletableUser, cleanupDeletableUser, cleanupInvitedUser, DELETABLE_USER_EMAIL } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -372,65 +372,11 @@ test.describe('Användarhantering (admin)', () => {
 
   test.afterEach(async () => {
     if (!invitedUserEmail) return;
-
-    // Use the same URL source as helpers.ts so cleanup targets the same project.
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://ihqqqynuqclycffgraxl.supabase.co';
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!serviceRoleKey) {
-      if (process.env.CI) {
-        console.warn(`⚠ Cleanup skipped for ${invitedUserEmail}: SUPABASE_SERVICE_ROLE_KEY not set in CI – stale test user may remain`);
-      }
-      invitedUserId = null;
-      invitedUserEmail = null;
-      return;
-    }
-
-    // If userId was not captured from the invite response, look it up via the profiles REST API.
-    if (!invitedUserId) {
-      const lookupResponse = await fetch(
-        `${supabaseUrl.replace(/\/$/, '')}/rest/v1/profiles?email=eq.${encodeURIComponent(invitedUserEmail)}&select=id&order=id.asc&limit=1`,
-        {
-          headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-        }
-      );
-      if (lookupResponse.ok) {
-        const profiles: Array<{ id: string }> = await lookupResponse.json();
-        invitedUserId = profiles[0]?.id ?? null;
-      } else if (process.env.CI) {
-        const lookupResponseBody = await lookupResponse.text();
-        console.warn(
-          `⚠ Cleanup profile lookup failed for ${invitedUserEmail}: ${lookupResponse.status} ${lookupResponse.statusText}${lookupResponseBody ? ` – ${lookupResponseBody}` : ''}`
-        );
-      }
-    }
-
-    if (!invitedUserId) {
-      invitedUserEmail = null;
-      return;
-    }
-
-    const deleteResponse = await fetch(
-      `${supabaseUrl.replace(/\/$/, '')}/auth/v1/admin/users/${invitedUserId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      }
-    );
-
+    const emailToClean = invitedUserEmail;
+    const idToClean = invitedUserId;
     invitedUserId = null;
     invitedUserEmail = null;
-
-    if (!deleteResponse.ok && deleteResponse.status !== 404) {
-      const body = await deleteResponse.text();
-      throw new Error(`Kunde inte radera inbjuden testanvändare: ${deleteResponse.status} ${body}`);
-    }
+    await cleanupInvitedUser(emailToClean, idToClean);
   });
 
   test('Användare-länk visas i nav för admin', async ({ page }) => {
@@ -456,7 +402,7 @@ test.describe('Användarhantering (admin)', () => {
     invitedUserEmail = inviteEmail;
     await page.fill('input[type="email"][placeholder*="E-post"]', inviteEmail);
 
-    // Edge Function returns { success: true, userId: string }
+    // Edge Function returns { success: true, emailSent: boolean, userId?: string, inviteLink?: string }
     // Use a synchronous predicate that inspects the *request* body to distinguish the
     // "invite" action from the "list" action (both POST to the same endpoint). Reading
     // the response body inside the predicate (async clone().json()) is unreliable and

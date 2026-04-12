@@ -8,6 +8,8 @@ export interface UserProfile {
 
 export interface InviteUserResult {
   userId?: string
+  emailSent?: boolean
+  inviteLink?: string
 }
 
 interface FunctionsErrorLike {
