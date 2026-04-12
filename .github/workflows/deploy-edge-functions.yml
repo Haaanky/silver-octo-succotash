@@ -1,0 +1,27 @@
+name: Deploy Edge Functions
+
+# Körs manuellt via GitHub Actions UI (Actions → Deploy Edge Functions → Run workflow)
+# eller automatiskt som en del av deploy.yml vid push till main.
+#
+# Kräver att SUPABASE_ACCESS_TOKEN finns som secret i "Supabase"-miljön.
+# Skaffa token på: https://supabase.com/dashboard/account/tokens
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: Supabase
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.84.2
+
+      - name: Deploy Edge Functions
+        run: supabase functions deploy invite-user --project-ref ihqqqynuqclycffgraxl
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

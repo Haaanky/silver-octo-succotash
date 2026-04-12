@@ -142,3 +142,94 @@ export async function loginAsWorker(page: Page) {
   await page.waitForURL(url => !url.hash.includes('login') && !url.pathname.includes('login'), { timeout: 30_000 });
   await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 30_000 });
 }
+
+// E-post för testanvändare som ska kunna tas bort via UI
+export const DELETABLE_USER_EMAIL = 'test-delete-playwright@playwright-test.local';
+
+/**
+ * Skapar en testanvändare som kan tas bort i UI-testet för användarhantering.
+ * Använder service role när den finns, annars fallback via vanlig signUp.
+ */
+export async function seedDeletableUser() {
+  if (SERVICE_ROLE_KEY) {
+    const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { error } = await serviceClient.auth.admin.createUser({
+      email: DELETABLE_USER_EMAIL,
+      password: 'deletable123',
+      email_confirm: true,
+    });
+    if (error && !/already registered|user already exists/i.test(error.message)) {
+      throw new Error(`seedDeletableUser failed: ${error.message}`);
+    }
+    return;
+  }
+
+  if (!ANON_KEY) {
+    throw new Error('seedDeletableUser failed: missing SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY');
+  }
+
+  const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+  const { error } = await anonClient.auth.signUp({
+    email: DELETABLE_USER_EMAIL,
+    password: 'deletable123',
+  });
+  if (error && !/already registered|user already exists/i.test(error.message)) {
+    throw new Error(`seedDeletableUser failed: ${error.message}`);
+  }
+}
+
+/**
+ * Cleans up a user that was invited/created during testing.
+ * Uses service role if available; falls back to admin sign-in + Edge Function delete.
+ */
+export async function cleanupInvitedUser(email: string, userId?: string | null) {
+  if (SERVICE_ROLE_KEY) {
+    const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    let targetId = userId ?? null;
+    if (!targetId) {
+      const { data } = await serviceClient.auth.admin.listUsers();
+      const found = data?.users?.find((u: { email?: string }) => u.email === email);
+      targetId = found?.id ?? null;
+    }
+    if (targetId) {
+      await serviceClient.auth.admin.deleteUser(targetId);
+    }
+    return;
+  }
+  if (!ANON_KEY) return;
+  // Fallback: sign in as admin and delete via Edge Function
+  const client = createClient(SUPABASE_URL, ANON_KEY);
+  const { error: signInError } = await client.auth.signInWithPassword({
+    email: ADMIN.email,
+    password: ADMIN.password,
+  });
+  if (signInError) {
+    console.warn(`cleanupInvitedUser: sign-in failed: ${signInError.message}`);
+    return;
+  }
+  try {
+    let targetId = userId ?? null;
+    if (!targetId) {
+      const { data: profiles } = await client.from('profiles').select('id').eq('email', email).limit(1);
+      targetId = (profiles as Array<{ id: string }> | null)?.[0]?.id ?? null;
+    }
+    if (targetId) {
+      const { error: deleteError } = await client.functions.invoke('invite-user', {
+        body: { action: 'delete', userId: targetId },
+      });
+      if (deleteError) {
+        console.warn(`cleanupInvitedUser: delete failed: ${deleteError.message}`);
+      }
+    }
+  } finally {
+    await client.auth.signOut();
+  }
+}
+
+/**
+ * Tar bort testanvändaren som skapades för borttagningstest.
+ * Kräver SUPABASE_SERVICE_ROLE_KEY eller SUPABASE_ANON_KEY (fallback via admin + Edge Function).
+ */
+export async function cleanupDeletableUser() {
+  await cleanupInvitedUser(DELETABLE_USER_EMAIL);
+}

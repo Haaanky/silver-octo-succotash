@@ -8,6 +8,7 @@ const navLinks = [
   { to: '/products', label: 'Produkter', adminOnly: true },
   { to: '/history', label: 'Historik', adminOnly: true },
   { to: '/export', label: 'Export' },
+  { to: '/users', label: 'Användare', adminOnly: true },
 ]
 
 export default function NavBar() {
