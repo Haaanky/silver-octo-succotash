@@ -442,9 +442,8 @@ test.describe('Användarhantering (admin)', () => {
       page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' }),
     ).toBeVisible({ timeout: 10_000 });
 
-    // After reload the mocked list includes the newly invited user.
-    await page.reload();
-    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    // The page refreshes the list in the background after a successful invite.
+    // The mocked list (listCallCount > 0) includes the newly invited user.
     await expect(page.locator('table')).toContainText(mockEmail, { timeout: 10_000 });
   });
 
