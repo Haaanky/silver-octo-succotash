@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker } from './helpers';
+import { ADMIN, loginAsAdmin, goto, seedProducts, cleanupSeedProducts, seedWorker, cleanupWorker, loginAsWorker, seedDeletableUser, cleanupDeletableUser, cleanupInvitedUser, DELETABLE_USER_EMAIL } from './helpers';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -352,6 +352,130 @@ test.describe('Sessionshantering', () => {
   });
 });
 
+// ─── Användarhantering ────────────────────────────────────────────────────────
+
+test.describe('Användarhantering (admin)', () => {
+  test.beforeAll(async () => {
+    await seedDeletableUser();
+  });
+
+  test.afterAll(async () => {
+    await cleanupDeletableUser();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  let invitedUserId: string | null = null;
+  let invitedUserEmail: string | null = null;
+
+  test.afterEach(async () => {
+    if (!invitedUserEmail) return;
+    const emailToClean = invitedUserEmail;
+    const idToClean = invitedUserId;
+    invitedUserId = null;
+    invitedUserEmail = null;
+    await cleanupInvitedUser(emailToClean, idToClean);
+  });
+
+  test('Användare-länk visas i nav för admin', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Användare' })).toBeVisible();
+  });
+
+  test('Admin kan navigera till /users', async ({ page }) => {
+    await page.getByRole('link', { name: 'Användare' }).click();
+    await expect(page.locator('h1')).toHaveText('Användare');
+  });
+
+  test('Sidan visar lista med befintliga användare', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table')).toContainText(ADMIN.email);
+  });
+
+  test('Admin kan bjuda in ny användare', async ({ page }) => {
+    // Strict unit test: mock all invite-user Edge Function calls so the test
+    // has no dependency on SMTP, Edge Function deployment, or Supabase state.
+    const mockEmail = 'test-invite-mock@example.com';
+    let listCallCount = 0;
+
+    await page.route('**/functions/v1/invite-user', async (route, request) => {
+      const body = request.postDataJSON() as { action?: string } | null;
+
+      if (body?.action === 'list') {
+        // First call (page load): return only the admin.
+        // Subsequent calls (after invite / after reload): include the new user.
+        const users =
+          listCallCount === 0
+            ? [{ id: 'admin-id', email: ADMIN.email, role: 'admin' }]
+            : [
+                { id: 'admin-id', email: ADMIN.email, role: 'admin' },
+                { id: 'new-user-id', email: mockEmail, role: 'worker' },
+              ];
+        listCallCount++;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ users }),
+        });
+      } else if (body?.action === 'invite') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, userId: 'new-user-id', emailSent: true }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await expect(page.locator('table')).toContainText(ADMIN.email, { timeout: 10_000 });
+
+    await page.fill('input[type="email"][placeholder*="E-post"]', mockEmail);
+    await page.click('button:has-text("Bjud in")');
+
+    await expect(
+      page.locator('[role="status"]').filter({ hasText: 'Inbjudan skickad' }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // The page refreshes the list in the background after a successful invite.
+    // The mocked list (listCallCount > 0) includes the newly invited user.
+    await expect(page.locator('table')).toContainText(mockEmail, { timeout: 10_000 });
+  });
+
+  test('Felmeddelande visas om e-post är ogiltig', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await page.fill('input[type="email"][placeholder*="E-post"]', 'inte-en-epost');
+    await page.click('button:has-text("Bjud in")');
+    // HTML5 validation or custom error message
+    const isInvalid = await page.locator('input[type="email"][placeholder*="E-post"]').evaluate(
+      (el: HTMLInputElement) => !el.validity.valid
+    );
+    const errorMsg = page.locator('[role="alert"]');
+    expect(isInvalid || await errorMsg.isVisible()).toBeTruthy();
+  });
+
+  test('Admin kan ta bort en användare', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Användare', { timeout: 10_000 });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15_000 });
+    // Wait for the deletable user to appear in the list
+    await expect(page.locator('table').getByText(DELETABLE_USER_EMAIL)).toBeVisible({ timeout: 15_000 });
+    // Click the delete button for that user
+    const row = page.locator('tr').filter({ hasText: DELETABLE_USER_EMAIL });
+    await row.getByRole('button', { name: /Ta bort/ }).click();
+    // Confirm deletion in the inline confirmation
+    await row.getByRole('button', { name: /Bekräfta/ }).click();
+    // User should no longer appear in the table
+    await expect(page.locator('table').getByText(DELETABLE_USER_EMAIL)).toHaveCount(0, { timeout: 15_000 });
+  });
+});
+
 // ─── Lagerarbetare-roll ───────────────────────────────────────────────────────
 
 test.describe('Lagerarbetare-roll', () => {
@@ -395,5 +519,14 @@ test.describe('Lagerarbetare-roll', () => {
 
   test('navbar visar worker-roll', async ({ page }) => {
     await expect(page.getByText('worker', { exact: true })).toBeVisible();
+  });
+
+  test('worker ser inte Användare-länk i nav', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Användare' })).toHaveCount(0);
+  });
+
+  test('worker omdirigeras från /users till lagerlistan', async ({ page }) => {
+    await goto(page, '/#/users');
+    await expect(page.locator('h1')).toHaveText('Lagerlista', { timeout: 10_000 });
   });
 });

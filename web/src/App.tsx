@@ -7,6 +7,7 @@ import Scan from './pages/Scan'
 import Products from './pages/Products'
 import History from './pages/History'
 import Export from './pages/Export'
+import Users from './pages/Users'
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/products" element={<Products />} />
             <Route path="/history" element={<History />} />
             <Route path="/export" element={<Export />} />
+            <Route path="/users" element={<Users />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

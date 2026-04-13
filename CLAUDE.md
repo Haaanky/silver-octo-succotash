@@ -107,6 +107,19 @@ Testerna i `tests/e2e/app.spec.ts` verifierar att följande faktiskt fungerar i 
 - Utloggning omdirigerar till `/login`
 - Skyddade sidor utan session omdirigerar till `/login`
 
+### ⛔ Tester får ALDRIG ändra produktionsinfrastruktur
+
+E2E-tester kan och ska skapa/radera **testdata** (produkter, testanvändare) i Supabase – dessa har dedikerade ID:n/e-postadresser och städas upp i `afterEach`/`afterAll`. Det är acceptabelt och nödvändigt för att testa appens faktiska beteende.
+
+**Det är däremot FÖRBJUDET att från ett test eller en PR-workflow:**
+- Deploya Edge Functions till produktionsprojektet
+- Köra Supabase-migrationer mot produktionsdatabasen
+- Ändra RLS-policys eller databasschema i produktion
+
+**Infrastrukturändringar (Edge Functions, migrationer) deployas UTESLUTANDE via `deploy.yml`** – dvs. automatiskt när en PR mergeas till `main`. Workflow-filen `e2e-pr.yml` ska inte innehålla några deploy-steg för infrastruktur.
+
+> **Varför:** En PR-körning som deployar till produktionsprojektet kan skriva över live-funktioner med okodgranskad kod och påverka riktiga användare innan koden ens godkänts.
+
 ### Lägga till tester för ny funktionalitet
 
 **Lägg alltid till Playwright-tester för ny funktionalitet** i `tests/e2e/app.spec.ts` (eller ny fil under `tests/e2e/`).
