@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <title>LagerApp</title>
+  <script>
+    var l = window.location;
+    l.replace(
+      l.protocol + '//' + l.host +
+      '/?p=' + encodeURIComponent(l.pathname.slice(1) + l.search) +
+      l.hash
+    );
+  </script>
+</head>
+<body>
+  <p>Omdirigerar…</p>
+</body>
+</html>
