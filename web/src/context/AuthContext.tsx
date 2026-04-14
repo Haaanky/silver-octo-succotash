@@ -12,12 +12,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 async function fetchProfile(userId: string): Promise<User | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id, email, role')
     .eq('id', userId)
     .single()
-  return data ?? null
+  if (error) throw error
+  return data
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -31,13 +32,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authSeqRef = useRef(0)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setUser(profile)
+    ;(async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id)
+          setUser(profile)
+        }
+      } catch {
+        // getSession returned an error, or fetchProfile threw – treat as no session
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
-    })
+    })()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const seq = ++authSeqRef.current
