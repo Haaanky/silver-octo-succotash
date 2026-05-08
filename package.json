@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:mock": "playwright test --config playwright.mock.config.ts",
+    "test:mock:report": "playwright show-report playwright-report-mock"
   },
   "repository": {
     "type": "git",

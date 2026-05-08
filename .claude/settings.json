@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git fetch*)",
+      "Bash(git pull*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(git stash list)",
+      "Bash(ls*)",
+      "Bash(find . *)",
+      "Bash(grep *)",
+      "Bash(cat *)",
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(npm ci)",
+      "Bash(npm install)",
+      "Bash(npm run build*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run type*)",
+      "Bash(npm run test:mock*)",
+      "Bash(npm --prefix web run build*)",
+      "Bash(npm --prefix web run lint*)",
+      "Bash(npm --prefix web run type*)",
+      "Bash(npx tsc*)",
+      "Bash(npx playwright install*)"
+    ],
+    "deny": []
+  }
+}
